@@ -1,0 +1,28 @@
+.on-demand-tab {
+    background-color: #aebb82;
+    color: #000;
+  }
+  
+  .scheduled-tab {
+    background-color: #ecf3c4;
+    color: #000000;
+  }
+  
+  .geo-fence-tab {
+    background-color: #2a71e4;
+    color: #fff;
+  }
+
+  .selected-contact {
+    background-color: #d61818; 
+  }
+  
+  .custom-ion-title {
+    font-size: 12px; 
+    white-space: nowrap; 
+    overflow: hidden; 
+    text-overflow: ellipsis;
+  }
+  
+  
+  
