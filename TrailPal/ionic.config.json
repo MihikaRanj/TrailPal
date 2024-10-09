@@ -1,0 +1,7 @@
+{
+  "name": "TrailPal",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "react-vite"
+}
