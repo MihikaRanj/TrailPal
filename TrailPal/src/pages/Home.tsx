@@ -1,23 +1,23 @@
-import { IonContent, IonHeader, IonPage, IonTitle, IonToolbar } from '@ionic/react';
-import ExploreContainer from '../components/ExploreContainer';
-import './Home.css';
+// src/pages/Home.tsx
+import React from 'react';
+import { IonPage, IonContent, IonButton } from '@ionic/react';
+import { useHistory } from 'react-router-dom';
+import BottomBar from '../components/BottomBar';
 
 const Home: React.FC = () => {
+  const history = useHistory();
+
   return (
     <IonPage>
-      <IonHeader>
-        <IonToolbar>
-          <IonTitle>Blank</IonTitle>
-        </IonToolbar>
-      </IonHeader>
-      <IonContent fullscreen>
-        <IonHeader collapse="condense">
-          <IonToolbar>
-            <IonTitle size="large">Blank</IonTitle>
-          </IonToolbar>
-        </IonHeader>
-        <ExploreContainer />
+      <IonContent className="ion-padding">
+        <IonButton expand="block" onClick={() => history.push('/track-route')}>
+          Track Route
+        </IonButton>
+        <IonButton expand="block" onClick={() => history.push('/settings')}>
+          Settings
+        </IonButton>
       </IonContent>
+      <BottomBar />
     </IonPage>
   );
 };
