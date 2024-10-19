@@ -51,7 +51,7 @@ const Login: React.FC = () => {
     <IonPage>
       <IonContent className="ion-padding">
         <IonItem>
-          <IonLabel position="floating">Email</IonLabel>
+          <IonLabel>Email</IonLabel>
           <IonInput
             value={email}
             type="email"
@@ -59,7 +59,7 @@ const Login: React.FC = () => {
           />
         </IonItem>
         <IonItem>
-          <IonLabel position="floating">Password</IonLabel>
+          <IonLabel>Password</IonLabel>
           <IonInput
             value={password}
             type="password"

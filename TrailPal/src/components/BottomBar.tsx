@@ -7,7 +7,7 @@ import {
   IonLabel,
 } from '@ionic/react';
 import { useHistory } from 'react-router-dom';
-import { walkOutline, settingsOutline, logOutOutline } from 'ionicons/icons';
+import { homeOutline, walkOutline, settingsOutline, logOutOutline } from 'ionicons/icons';
 import { auth } from '../firebaseConfig';
 
 const BottomBar: React.FC = () => {
@@ -20,6 +20,10 @@ const BottomBar: React.FC = () => {
 
   return (
     <IonTabBar slot="bottom">
+      <IonTabButton tab="home" onClick={() => history.push('/home')}>
+        <IonIcon icon={homeOutline} />
+        <IonLabel>Home</IonLabel>
+      </IonTabButton>
       <IonTabButton tab="track-route" onClick={() => history.push('/track-route')}>
         <IonIcon icon={walkOutline} />
         <IonLabel>Track Route</IonLabel>

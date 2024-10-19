@@ -4,13 +4,13 @@ import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
-    apiKey: "AIzaSyCH69egmm4aGKsiP7t5lOE55jw4JqgOzUc",
-    authDomain: "trailpath-b857e.firebaseapp.com",
-    projectId: "trailpath-b857e",
-    storageBucket: "trailpath-b857e.appspot.com",
-    messagingSenderId: "888504770138",
-    appId: "1:888504770138:web:0a8ba430d12d1b82558263"
-  };
+  apiKey: "AIzaSyCkncIHmyvnc03mQ8Wg4yFopKocdx-FEA4",
+  authDomain: "trailpal-983de.firebaseapp.com",
+  projectId: "trailpal-983de",
+  storageBucket: "trailpal-983de.appspot.com",
+  messagingSenderId: "690309186701",
+  appId: "1:690309186701:web:93f742d4d7878aeea48ec4"
+};
 
 const app = initializeApp(firebaseConfig);
 

@@ -1,0 +1,20 @@
+.on-demand-tab {
+    background-color: #d3e6f6;
+    color: #000;
+  }
+  
+  .scheduled-tab {
+    background-color: #a6c5da;
+    color: #fff;
+  }
+  
+  .geo-fence-tab {
+    background-color: #2a71e4;
+    color: #fff;
+  }
+
+  .selected-contact {
+    background-color: #d61818; /* Change to the color you want */
+  }
+  
+  
