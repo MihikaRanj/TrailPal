@@ -1,14 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { IonContent, IonPage, IonHeader, IonToolbar, IonTitle, IonSelect, IonSelectOption, IonItem, IonLabel, IonButtons, IonButton, IonIcon, IonFooter, IonModal } from '@ionic/react';
+import { IonContent, IonPage, IonHeader, IonToolbar, IonTitle, IonSelect, IonSelectOption, IonItem, IonLabel, IonButtons, IonButton, IonIcon, IonFooter, IonModal, IonToast, IonInput, IonRadio, IonRadioGroup } from '@ionic/react';
 import { useHistory } from 'react-router';
 import BottomBar from '../components/BottomBar';
-import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, setDoc } from 'firebase/firestore';
+import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, setDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../firebaseConfig';
 import { arrowBack, refreshOutline } from 'ionicons/icons';
 import ContactForm from '../components/ContactForm';
+import { useIonViewWillEnter } from '@ionic/react';
 import './TrailPal.css';
 
-const OnDemandTracking: React.FC = () => {
+const CreateScheduledRoute: React.FC = () => {
   const history = useHistory();
   const [selectedRoute, setSelectedRoute] = useState<string | null>(null);
   const [selectedContactOption, setSelectedContactOption] = useState<string | null>(null);
@@ -23,9 +24,13 @@ const OnDemandTracking: React.FC = () => {
   const [showSelectContactModal, setShowSelectContactModal] = useState(false);
   const [savedContacts, setSavedContacts] = useState<any[]>([]);
   const [selectedContact, setSelectedContact] = useState<any | null>(null);
-  const [showSelectRouteModal, setShowSelectRouteModal] = useState(false); // State for showing route selection modal
-  const [savedRoutes, setSavedRoutes] = useState<any[]>([]); // State for saved routes
-  const [selectedSavedRoute, setSelectedSavedRoute] = useState<any | null>(null); // State for currently selected route in modal
+  const [showSelectRouteModal, setShowSelectRouteModal] = useState(false); 
+  const [savedRoutes, setSavedRoutes] = useState<any[]>([]);
+  const [selectedSavedRoute, setSelectedSavedRoute] = useState<any | null>(null);
+  const [currentRoute, setCurrentRoute] = useState<any>(null);
+  const [currentContact, setCurrentContact] = useState<any>(null);
+  const [enableTracking, setEnableTracking] = useState<boolean>(false); // State for tracking radio button
+  const [scheduledStartTime, setScheduledStartTime] = useState<string | null>(null); // New state for scheduled start time
 
   const user = auth.currentUser;
 
@@ -44,15 +49,17 @@ const OnDemandTracking: React.FC = () => {
           setStops(routeData.stops?.map((stop: any) => stop.address) || []);
           setMethodOfTravel(routeData.methodOfTravel || null);
           setEstimatedTime(routeData.estimatedTime || null);
+          setCurrentRoute(routeData);
         }
 
         const contactSnapshot = await getDoc(contactDoc);
         if (contactSnapshot.exists()) {
           const contactData = contactSnapshot.data();
+          setCurrentContact(contactData);
           setContact({
             name: contactData.name,
             phone: contactData.phone,
-            email: contactData.email
+            email: contactData.email,
           });
         }
       }
@@ -60,7 +67,46 @@ const OnDemandTracking: React.FC = () => {
     };
 
     fetchRouteData();
+
+    
   }, [user]);
+
+  // Load route and contact data on view enter
+  useIonViewWillEnter(() => {
+    loadData();
+  });
+
+  // Fetch route and contact details from Firestore
+  const loadData = async () => {
+    if (user) {
+      const routesCollection = collection(db, 'users', user.uid, 'currentdata');
+      const routeDoc = doc(routesCollection, 'currentRoute');
+      const contactDoc = doc(routesCollection, 'currentContact');
+
+      const routeSnapshot = await getDoc(routeDoc);
+      if (routeSnapshot.exists()) {
+        const routeData = routeSnapshot.data();
+        setStartLocation(routeData.startlocation?.address || null);
+        setEndLocation(routeData.endlocation?.address || null);
+        setStops(routeData.stops?.map((stop: any) => stop.address) || []);
+        setMethodOfTravel(routeData.methodOfTravel || null);
+        setEstimatedTime(routeData.estimatedTime || null);
+        setCurrentRoute(routeData);
+      }
+
+      const contactSnapshot = await getDoc(contactDoc);
+      if (contactSnapshot.exists()) {
+        const contactData = contactSnapshot.data();
+        setCurrentContact(contactData);
+        setContact({
+          name: contactData.name,
+          phone: contactData.phone,
+          email: contactData.email,
+        });
+      }
+  }; 
+};
+
 
   const clearRouteData = async () => {
     if (user) {
@@ -85,14 +131,33 @@ const OnDemandTracking: React.FC = () => {
     setContact(null);
     history.replace({ pathname: history.location.pathname, state: undefined });
   };
+  
 
+
+ const saveScheduledRoutes = async () => {
+    if (!user) return;
+
+    try {
+      await addDoc(collection(db, 'users', user.uid, 'savedscheduledroutes'), {
+        route: currentRoute,
+        contact: currentContact,
+        scheduledStartTime: scheduledStartTime,
+        enableTracking: enableTracking,
+      });
+      alert('Scheduled tracking has been enabled!');
+    } catch (error) {
+      console.error('Error saving scheduled tracking:', error);
+      alert('Failed to enable scheduled tracking.');
+    }
+  };
+  
   const handleRefresh = async () => {
     await clearRouteData();
   };
 
   const handleBack = async () => {
     await clearRouteData();
-    history.push('/track-route');
+    history.push('/track-route/scheduled');
   };
 
   const handleContactBack = async (name: string, phone: string, email: string) => {
@@ -106,8 +171,10 @@ const OnDemandTracking: React.FC = () => {
 
       try {
         if (user) {
-          const contactDoc = doc(db, 'users', user.uid, 'currentdata', 'currentContact');
-          await setDoc(contactDoc, newContact);
+          const routesCollection = collection(db, 'users', user.uid, 'currentdata');
+          const contactDoc = doc(routesCollection, 'currentContact');      
+      
+          await setDoc(contactDoc, newContact, { merge: true }); // Update Firestore with new field value
           setContact(newContact);
         }
       } catch (error) {
@@ -157,8 +224,10 @@ const OnDemandTracking: React.FC = () => {
             alert('Contact saved successfully to saved contacts!');
           }
 
-          const currentContactDoc = doc(db, 'users', user.uid, 'currentdata', 'currentContact');
-          await setDoc(currentContactDoc, newContact);
+          
+          const routesCollection = collection(db, 'users', user.uid, 'currentdata');
+          const currentContactDoc = doc(routesCollection, 'currentContact');      
+          await setDoc(currentContactDoc, newContact, { merge: true }); // Update Firestore with new field value
           setContact(newContact);
 
         }
@@ -193,10 +262,14 @@ const OnDemandTracking: React.FC = () => {
   const handleSelectContact = async () => {
     if (selectedContact) {
       try {
-        const currentContactDoc = doc(db, 'users', user.uid, 'currentdata', 'currentContact');
-        await setDoc(currentContactDoc, selectedContact);
-        setContact(selectedContact);
-        setShowSelectContactModal(false);
+        if (user){
+          const routesCollection = collection(db, 'users', user.uid, 'currentdata');
+          const contactDoc = doc(routesCollection, 'currentContact');      
+      
+          await setDoc(contactDoc, selectedContact, { merge: true }); // Update Firestore with new field value
+          setContact(selectedContact);
+          setShowSelectContactModal(false);
+        }
       } catch (error) {
         console.error('Error selecting contact:', error);
         alert('Failed to select the contact. Please try again.');
@@ -239,17 +312,30 @@ const OnDemandTracking: React.FC = () => {
     }
   };
 
+   // Enable Schedule Tracking Button only when all required fields are filled
+  const isScheduleTrackingEnabled = () => {
+    console.log("before setting save enabled");
+    console.log(currentRoute);
+    console.log(currentContact);
+    console.log(scheduledStartTime);
+    return currentRoute && currentContact && scheduledStartTime;
+  };
+
+
   const handleSelectRoute = async () => {
     if (selectedSavedRoute) {
       try {
-        const currentRouteDoc = doc(db, 'users', user.uid, 'currentdata', 'currentRoute');
-        await setDoc(currentRouteDoc, selectedSavedRoute);
-        setStartLocation(selectedSavedRoute.startlocation?.address || null);
-        setEndLocation(selectedSavedRoute.endlocation?.address || null);
-        setStops(selectedSavedRoute.stops?.map((stop: any) => stop.address) || []);
-        setMethodOfTravel(selectedSavedRoute.methodOfTravel || null);
-        setEstimatedTime(selectedSavedRoute.estimatedTime || null);
-        setShowSelectRouteModal(false);
+        if (user){
+          const routesCollection = collection(db, 'users', user.uid, 'currentdata');
+          const currentRouteDoc = doc(routesCollection, 'currentRoute');            
+          await setDoc(currentRouteDoc, selectedSavedRoute, { merge: true }); // Update Firestore with new field value
+          setStartLocation(selectedSavedRoute.startlocation?.address || null);
+          setEndLocation(selectedSavedRoute.endlocation?.address || null);
+          setStops(selectedSavedRoute.stops?.map((stop: any) => stop.address) || []);
+          setMethodOfTravel(selectedSavedRoute.methodOfTravel || null);
+          setEstimatedTime(selectedSavedRoute.estimatedTime || null);
+          setShowSelectRouteModal(false);
+        }
       } catch (error) {
         console.error('Error selecting route:', error);
         alert('Failed to select the route. Please try again.');
@@ -266,6 +352,8 @@ const OnDemandTracking: React.FC = () => {
     return <IonContent>Loading...</IonContent>;
   }
 
+
+
   return (
     <IonPage>
       <IonHeader>
@@ -276,7 +364,7 @@ const OnDemandTracking: React.FC = () => {
               Back
             </IonButton>
           </IonButtons>
-          <IonTitle>On-demand Tracking</IonTitle>
+          <IonTitle>Create Scheduled Tracking Route</IonTitle>
           <IonButtons slot="end">
             <IonButton onClick={handleRefresh}>
               <IonIcon slot="icon-only" icon={refreshOutline} />
@@ -290,13 +378,9 @@ const OnDemandTracking: React.FC = () => {
           <IonItem>
             <IonLabel>
               <h1>Selected Route</h1>
-              {/*               <p>Start: {startLocation}</p>
-              <p>End: {endLocation}</p>
-              <p>Estimated Time: {estimatedTime}</p> */}
             </IonLabel>
           </IonItem>
         ) : (
-
           <IonItem>
             <IonLabel>Route</IonLabel>
             <IonSelect
@@ -369,6 +453,32 @@ const OnDemandTracking: React.FC = () => {
                 <IonLabel>Email: {contact?.email}</IonLabel>
                 </IonItem>
               )}
+
+        {/* Scheduled Start Time input */}
+        <IonItem>
+          <IonLabel>Scheduled Start Time:</IonLabel>
+          <IonInput
+            type="time"
+            value={scheduledStartTime || ''}
+            onIonChange={(e) => setScheduledStartTime(e.detail.value!)}
+          />
+        </IonItem>
+
+         {/* Enable Tracking radio button */}
+         <IonRadioGroup
+                  value={enableTracking} // This should control the state
+                  onIonChange={(e) => setEnableTracking(e.detail.value === 'true')}
+                >
+                  <IonItem>
+                    <IonLabel>Enable Tracking</IonLabel>
+                    <IonRadio slot="start" value="true" checked={enableTracking === true} />
+                  </IonItem>
+                  <IonItem>
+                    <IonLabel>Disable Tracking</IonLabel>
+                    <IonRadio slot="start" value="false" checked={enableTracking === false} />
+                  </IonItem>
+                </IonRadioGroup>
+
 
 
         <IonModal isOpen={showContactModal} onDidDismiss={() => setShowContactModal(false)}>
@@ -465,13 +575,19 @@ const OnDemandTracking: React.FC = () => {
           </IonFooter>
         </IonModal>
 
-        
+        {/* Conditionally enable button */}
+        <IonButton
+          onClick={saveScheduledRoutes}
+          disabled={!isScheduleTrackingEnabled()}
+
+          expand="full" 
+        >
+          Save
+        </IonButton>
       </IonContent>
-      <IonButton expand="block" >Start Tracking</IonButton>
       <BottomBar />
     </IonPage>
   );
 };
 
-
-export default OnDemandTracking;
+export default CreateScheduledRoute;

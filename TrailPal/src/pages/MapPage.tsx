@@ -115,6 +115,7 @@ const MapPage: React.FC = () => {
       } else if (type === 'stop' && stopIndex !== undefined) {
         routeData.stops[parseInt(stopIndex)] = { address, lat: selectedCoordinates.lat, lon: selectedCoordinates.lon };
       }
+      console.log(routeData);
 
       await setDoc(routeDoc, routeData); // Save the document in the user's routes collection
 

@@ -1,11 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { IonContent, IonPage, IonHeader, IonToolbar, IonTitle, IonSelect, IonSelectOption, IonItem, IonLabel, IonButtons, IonButton, IonIcon, IonFooter, IonModal } from '@ionic/react';
+import { IonContent, IonPage, IonHeader, IonToolbar, IonTitle, IonSelect, IonSelectOption, IonItem, IonLabel, IonButtons, IonButton, IonIcon, IonFooter, IonModal, IonToast } from '@ionic/react';
 import { useHistory } from 'react-router';
 import BottomBar from '../components/BottomBar';
 import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, setDoc } from 'firebase/firestore';
 import { auth, db } from '../firebaseConfig';
 import { arrowBack, refreshOutline } from 'ionicons/icons';
 import ContactForm from '../components/ContactForm';
+import { useIonViewWillEnter } from '@ionic/react';
+import { Geolocation } from '@capacitor/geolocation';
+import { findNearest, getDistance } from 'geolib';  // For distance calculation
 import './TrailPal.css';
 
 const OnDemandTracking: React.FC = () => {
@@ -26,6 +29,11 @@ const OnDemandTracking: React.FC = () => {
   const [showSelectRouteModal, setShowSelectRouteModal] = useState(false); // State for showing route selection modal
   const [savedRoutes, setSavedRoutes] = useState<any[]>([]); // State for saved routes
   const [selectedSavedRoute, setSelectedSavedRoute] = useState<any | null>(null); // State for currently selected route in modal
+  const [tracking, setTracking] = useState(false);
+  const [deviationAlertSent, setDeviationAlertSent] = useState(false); // To avoid multiple alerts
+  const [currentRoute, setCurrentRoute] = useState<any>(null);
+  const [currentContact, setCurrentContact] = useState<any>(null);
+  const [watchId, setWatchId] = useState<string | null>(null);  // Store the watch ID for stopping the tracking
 
   const user = auth.currentUser;
 
@@ -61,6 +69,216 @@ const OnDemandTracking: React.FC = () => {
 
     fetchRouteData();
   }, [user]);
+
+  // Load route and contact data on view enter
+  useIonViewWillEnter(() => {
+    loadData();
+  });
+
+  // Fetch route and contact details from Firestore
+  const loadData = async () => {
+    if (user) {
+      const routesCollection = collection(db, 'users', user.uid, 'currentdata');
+      const routeDoc = doc(routesCollection, 'currentRoute');
+      const contactDoc = doc(routesCollection, 'currentContact');
+
+      const routeSnapshot = await getDoc(routeDoc);
+      /* console.log("routeSnapshot");
+      console.log(routeSnapshot); */
+      if (routeSnapshot.exists()) {
+        const routeData = routeSnapshot.data();
+        setStartLocation(routeData.startlocation?.address || null);
+        setEndLocation(routeData.endlocation?.address || null);
+        setStops(routeData.stops?.map((stop: any) => stop.address) || []);
+        setMethodOfTravel(routeData.methodOfTravel || null);
+        setEstimatedTime(routeData.estimatedTime || null);
+        setCurrentRoute(routeData)
+      }
+
+      const contactSnapshot = await getDoc(contactDoc);
+      /* console.log("contactSnapshot");
+      console.log(contactSnapshot); */
+      if (contactSnapshot.exists()) {
+        const contactData = contactSnapshot.data();
+        setCurrentContact(contactData);
+        setContact({
+          name: contactData.name,
+          phone: contactData.phone,
+          email: contactData.email
+        });
+      }
+  }; 
+};
+
+const startTracking = async () => {
+  loadData();
+  // Ensure that currentRoute and currentContact are fully loaded
+  if (!currentRoute || !currentContact) {
+    console.log('Route or contact data missing, tracking cannot start.');
+    return;
+  }
+
+  setTracking(true);
+
+  // Send initial notification to contact
+  await sendNotificationToContact('tracking-started', {
+    location: await getCurrentLocationWithRetries(),
+    route: currentRoute,
+  });
+
+  // Start location tracking
+  trackLocation();
+};
+
+const trackLocation = async () => {
+  const routePath = getRoutePath(); // Helper function to build the path from start, stops, to end
+
+  const watchId = await Geolocation.watchPosition({}, async (position) => {
+    const { latitude, longitude } = position?.coords;
+    const currentLocation = { latitude, longitude };
+
+    if (!latitude || !longitude || !routePath.length) return; // Ensure valid data
+
+    console.log('checking deviationalert');
+    console.log(watchId);
+    // Check if the user deviates from the path
+    if (!deviationAlertSent && !isOnRoute(currentLocation, routePath)) {
+      setDeviationAlertSent(true);
+      await sendNotificationToContact('route-deviation', {
+        location: currentLocation,
+      });
+    }
+
+    console.log('checking hasReachedDestination');
+    // Check if the user has reached the destination
+    if (hasReachedDestination(currentLocation)) {
+      await sendNotificationToContact('reached-destination', {
+        location: currentLocation,
+      });
+      stopTracking();
+    }
+
+    console.log('checking setTimeout');
+    // Check if the user is late
+    setTimeout(async () => {
+      if (!hasReachedDestination(await getCurrentLocation())) {
+        await sendNotificationToContact('late-arrival', {
+          location: await getCurrentLocation(),
+        });
+        console.log('inside settimeout');
+        stopTracking();
+      }
+    }, (currentRoute.estimatedTime + 1) * 60 * 1000); // Estimated time + buffer- here 1 is bufferTime in minutes
+  });
+
+  setWatchId(watchId);  // Store the watch ID to stop tracking later
+};
+
+
+
+const stopTracking = () => {
+  if (watchId) {
+    Geolocation.clearWatch({ id: watchId });
+    setWatchId(null);
+  }
+  setTracking(false);
+};
+
+  // Helper to get route path: an array of waypoints
+  const getRoutePath = () => {
+    const path = [currentRoute.startlocation, ...(currentRoute.stops || []), currentRoute.endlocation];
+    // Ensure all locations have valid lat/lon
+    return path.map((location) => ({
+      latitude: location?.lat,
+      longitude: location?.lon,
+    })).filter(location => location.latitude && location.longitude);
+  };
+
+  // Helper to check if the user is on the route within a 5 mile range
+  const isOnRoute = (currentLocation: any, routePath: any[]) => {
+    console.log("isOnRoute");
+    console.log(currentLocation);
+    console.log(routePath);
+    const closestPoint = findNearest(currentLocation, routePath);
+    const distanceToRoute = getDistance(currentLocation, closestPoint);
+    return distanceToRoute <= 8046.72; // 5 miles in meters
+  };
+
+  // Helper to check if the user has reached the destination
+  const hasReachedDestination = (currentLocation: any) => {
+    console.log("hasReachedDestination");
+    console.log(currentLocation);
+    console.log(currentRoute);
+    const destination = {
+      latitude: currentRoute.endlocation.lat,
+      longitude: currentRoute.endlocation.lon,
+    };
+    console.log(destination);
+    const distanceToDestination = getDistance(currentLocation, destination);
+    return distanceToDestination <= 100; // 100 meters as the arrival threshold
+  };
+
+  // Helper to get the current user's location
+  const getCurrentLocation = async () => {
+    try {
+      const position = await Geolocation.getCurrentPosition({
+        enableHighAccuracy: true,  // Request high accuracy for better GPS results
+        timeout: 10000,            // Set a timeout of 10 seconds (10000 ms)
+        maximumAge: 0              // Do not use a cached location
+      });
+  
+      return {
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+      };
+    } catch (error) {
+      console.error('Error getting current location:', error);
+      throw error;  // Re-throw the error to handle it in the calling function
+    }
+  };
+
+  const getCurrentLocationWithRetries = async (retries = 3) => {
+    while (retries > 0) {
+      try {
+        return await getCurrentLocation();
+      } catch (error) {
+        if (error.code === 3 && retries > 0) {  // Handle timeout error
+          console.log('Retrying location fetch...');
+          retries -= 1;
+        } else {
+          throw error;
+        }
+      }
+    }
+    throw new Error('Unable to get location after multiple attempts');
+  };
+  
+  
+  // Send notification to the contact user
+  const sendNotificationToContact = async (type: string, data: any) => {
+    const payload = {
+      type,
+      message: buildNotificationMessage(type, data),
+      recipientEmail: contact?.email,
+    };
+    console.log(payload);
+    //await sendInAppNotification(payload); // Assuming this sends the notification
+  };
+
+  const buildNotificationMessage = (type: string, data: any) => {
+    switch (type) {
+      case 'tracking-started':
+        return `${user?.email} has started their journey. Route details: ${JSON.stringify(data.route)}`;
+      case 'route-deviation':
+        return `${user?.email} has deviated from the planned route! Current location: ${JSON.stringify(data.location)}`;
+      case 'reached-destination':
+        return `${user?.email} has safely reached the destination.`;
+      case 'late-arrival':
+        return `${user?.email} has not arrived at the destination on time. Last known location: ${JSON.stringify(data.location)}`;
+      default:
+        return '';
+    }
+  };
 
   const clearRouteData = async () => {
     if (user) {
@@ -106,8 +324,10 @@ const OnDemandTracking: React.FC = () => {
 
       try {
         if (user) {
-          const contactDoc = doc(db, 'users', user.uid, 'currentdata', 'currentContact');
-          await setDoc(contactDoc, newContact);
+          const routesCollection = collection(db, 'users', user.uid, 'currentdata');
+          const contactDoc = doc(routesCollection, 'currentContact');      
+          await setDoc(contactDoc, newContact, { merge: true }); // Update Firestore with new field value   
+        
           setContact(newContact);
         }
       } catch (error) {
@@ -157,8 +377,11 @@ const OnDemandTracking: React.FC = () => {
             alert('Contact saved successfully to saved contacts!');
           }
 
-          const currentContactDoc = doc(db, 'users', user.uid, 'currentdata', 'currentContact');
-          await setDoc(currentContactDoc, newContact);
+         
+          const routesCollection = collection(db, 'users', user.uid, 'currentdata');
+          const currentContactDoc = doc(routesCollection, 'currentContact');            
+          await setDoc(currentContactDoc, newContact, { merge: true }); // Update Firestore with new field value
+
           setContact(newContact);
 
         }
@@ -193,10 +416,14 @@ const OnDemandTracking: React.FC = () => {
   const handleSelectContact = async () => {
     if (selectedContact) {
       try {
-        const currentContactDoc = doc(db, 'users', user.uid, 'currentdata', 'currentContact');
-        await setDoc(currentContactDoc, selectedContact);
-        setContact(selectedContact);
-        setShowSelectContactModal(false);
+        if (user){
+          const routesCollection = collection(db, 'users', user.uid, 'currentdata');
+          const contactDoc = doc(routesCollection, 'currentContact');      
+      
+          await setDoc(contactDoc, selectedContact, { merge: true }); // Update Firestore with new field value
+          setContact(selectedContact);
+          setShowSelectContactModal(false);
+        }
       } catch (error) {
         console.error('Error selecting contact:', error);
         alert('Failed to select the contact. Please try again.');
@@ -242,14 +469,17 @@ const OnDemandTracking: React.FC = () => {
   const handleSelectRoute = async () => {
     if (selectedSavedRoute) {
       try {
-        const currentRouteDoc = doc(db, 'users', user.uid, 'currentdata', 'currentRoute');
-        await setDoc(currentRouteDoc, selectedSavedRoute);
-        setStartLocation(selectedSavedRoute.startlocation?.address || null);
-        setEndLocation(selectedSavedRoute.endlocation?.address || null);
-        setStops(selectedSavedRoute.stops?.map((stop: any) => stop.address) || []);
-        setMethodOfTravel(selectedSavedRoute.methodOfTravel || null);
-        setEstimatedTime(selectedSavedRoute.estimatedTime || null);
-        setShowSelectRouteModal(false);
+        if (user){
+          const routesCollection = collection(db, 'users', user.uid, 'currentdata');
+          const currentRouteDoc = doc(routesCollection, 'currentRoute');            
+          await setDoc(currentRouteDoc, selectedSavedRoute, { merge: true }); // Update Firestore with new field value
+          setStartLocation(selectedSavedRoute.startlocation?.address || null);
+          setEndLocation(selectedSavedRoute.endlocation?.address || null);
+          setStops(selectedSavedRoute.stops?.map((stop: any) => stop.address) || []);
+          setMethodOfTravel(selectedSavedRoute.methodOfTravel || null);
+          setEstimatedTime(selectedSavedRoute.estimatedTime || null);
+          setShowSelectRouteModal(false);
+        }
       } catch (error) {
         console.error('Error selecting route:', error);
         alert('Failed to select the route. Please try again.');
@@ -467,11 +697,22 @@ const OnDemandTracking: React.FC = () => {
 
         
       </IonContent>
-      <IonButton expand="block" >Start Tracking</IonButton>
+        <IonButton onClick={startTracking} disabled={tracking}>
+          Start Tracking
+        </IonButton>
+        <IonButton onClick={stopTracking} disabled={!tracking}>
+          Stop Tracking
+        </IonButton>
+
+        {/* Optionally show a toast when tracking starts */}
+        <IonToast
+          isOpen={tracking}
+          message="Tracking started."
+          duration={2000}
+        />
       <BottomBar />
     </IonPage>
   );
 };
-
 
 export default OnDemandTracking;

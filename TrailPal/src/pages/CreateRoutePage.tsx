@@ -59,22 +59,6 @@ const CreateRoutePage: React.FC = () => {
     fetchRouteData();
   }, [user]);
 
-  useEffect(() => {
-    if (locationState.state) {
-      const { location, type, stopIndex } = locationState.state;
-
-      if (type === 'start') {
-        setStartLocation(location);
-      } else if (type === 'end') {
-        setEndLocation(location);
-      } else if (type === 'stop' && stopIndex !== undefined) {
-        const updatedStops = [...stops];
-        updatedStops[stopIndex] = location;
-        setStops(updatedStops);
-      }
-    }
-  }, [locationState.state, stops]);
-
   const clearRouteData = async () => {
     if (user) {
       try {
@@ -101,20 +85,41 @@ const CreateRoutePage: React.FC = () => {
 
   const handleSaveRoute = async () => {
     if (startLocation && endLocation && estimatedTime) {
-      const route = {
-        startlocation: { address: startLocation },
-        endlocation: { address: endLocation },
-        stops: stops.map((stop) => ({ address: stop })),
-        methodOfTravel: methodOfTravel || 'Not specified', // Save method of travel
-        estimatedTime: estimatedTime + ' minutes', // Save estimated time
-        createdAt: new Date(),
-      };
-
       try {
         if (user) {
-          const savedRoutesCollection = collection(db, 'users', user.uid, 'savedroutes');
-          await addDoc(savedRoutesCollection, route);
-          alert('Route saved successfully to saved routes!');
+          const routesCollection = collection(db, 'users', user.uid, 'currentdata');
+          const routeDoc = doc(routesCollection, 'currentRoute');
+          const docSnapshot = await getDoc(routeDoc);
+  
+          if (docSnapshot.exists()) {
+            const routeData = docSnapshot.data(); // Retrieve the full route data from currentdata
+  
+            const route = {
+              startlocation: {
+                address: routeData.startlocation.address,
+                lat: routeData.startlocation.lat,
+                lon: routeData.startlocation.lon,
+              },
+              endlocation: {
+                address: routeData.endlocation.address,
+                lat: routeData.endlocation.lat,
+                lon: routeData.endlocation.lon,
+              },
+              stops: routeData.stops.map((stop: any) => ({
+                address: stop.address,
+                lat: stop.lat,
+                lon: stop.lon,
+              })),
+              methodOfTravel: methodOfTravel || 'Not specified', // Save method of travel
+              estimatedTime: estimatedTime + ' minutes', // Save estimated time
+              createdAt: new Date(),
+            };
+  
+            const savedRoutesCollection = collection(db, 'users', user.uid, 'savedroutes');
+            await addDoc(savedRoutesCollection, route); // Save the complete route
+          } else {
+            alert('Failed to retrieve current route data.');
+          }
         }
       } catch (error) {
         console.error('Error saving route:', error);
@@ -124,7 +129,7 @@ const CreateRoutePage: React.FC = () => {
       alert('Please enter both start and end locations, and the estimated journey time.');
     }
   };
-
+  
   const handleFieldUpdate = async (field: string, value: any) => {
     if (user) {
       const routesCollection = collection(db, 'users', user.uid, 'currentdata');
@@ -248,12 +253,12 @@ const CreateRoutePage: React.FC = () => {
 
       
         <IonToolbar>
-          <IonButton  onClick={handleAddStop}>
+          <IonButton expand="full"  onClick={handleAddStop}>
             Add Stop
           </IonButton>
 
           {/* Save Route Button */}
-          <IonButton
+          <IonButton expand="full" 
            
             onClick={handleSaveRoute}
             disabled={!startLocation || !endLocation || !estimatedTime} // Disable until required fields are filled
@@ -261,7 +266,7 @@ const CreateRoutePage: React.FC = () => {
             Save Route
           </IonButton>
 
-          <IonButton onClick={handleShowRoute}>
+          <IonButton expand="full"  onClick={handleShowRoute}>
             Show Route
           </IonButton>
         </IonToolbar>

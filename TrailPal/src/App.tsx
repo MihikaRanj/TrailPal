@@ -8,8 +8,6 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './firebaseConfig';
 import Login from './pages/Login';
 import Home from './pages/Home';
-import Location from './pages/Location';
-import TrackRoute from './pages/TrackRoute';
 import Settings from './pages/Settings';
 
 /* Core CSS required for Ionic components to work properly */
@@ -42,13 +40,14 @@ import '@ionic/react/css/palettes/dark.system.css';
 /* Theme variables */
 import './theme/variables.css';
 import MapPage from './pages/MapPage';
-import InputPage from './pages/InputPage';
 import RoutesPage from './pages/RoutesPage';
 import CreateRoutePage from './pages/CreateRoutePage';
 import TrackRoutePage from './pages/TrackRoutePage';
 import GeoFenceLocation from './pages/GeoFenceLocation';
 import OnDemandTracking from './pages/OnDemandTracking';
 import ScheduledTracking from './pages/ScheduledTracking';
+import CreateScheduledRoute from './pages/CreateScheduledRoute';
+import ViewUpdateScheduledRoute from './pages/ViewUpdateScheduledRoute';
 
 setupIonicReact();
 
@@ -72,11 +71,11 @@ const App: React.FC = () => {
             <Route path="/home" component={Home} exact />
             <Route path="/track-route" component={TrackRoutePage} exact />
             <Route path="/settings" component={Settings} exact />
-            <Route path="/location" component={Location} exact />
             <Route path="/routes" component={RoutesPage} exact />
             <Route path="/create-route" component={CreateRoutePage} />
+            <Route path="/create-scheduled-route" component={CreateScheduledRoute} />
+            <Route path="/view-update-scheduled-route" component={ViewUpdateScheduledRoute} />
             <Route path="/map/:type/:stopIndex?" component={MapPage} />
-            <Route path="/input" component={InputPage} exact />
             <Route path="/track-route/on-demand" component={OnDemandTracking} exact />
             <Route path="/track-route/scheduled" component={ScheduledTracking} exact />
             <Route path="/track-route/geo-fence" component={GeoFenceLocation} exact />

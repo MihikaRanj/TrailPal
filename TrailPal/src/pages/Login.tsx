@@ -10,11 +10,12 @@ import {
   IonToast,
 } from '@ionic/react';
 import { useHistory } from 'react-router-dom';
-import { auth } from '../firebaseConfig';
+import { auth, db } from '../firebaseConfig'; // Import db from firebaseConfig for Firestore
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
 } from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore'; // Firestore functions
 
 const Login: React.FC = () => {
   const [email, setEmail] = useState<string>();
@@ -23,6 +24,7 @@ const Login: React.FC = () => {
   const [toastMessage, setToastMessage] = useState<string>('');
   const history = useHistory();
 
+  // Function to handle user login
   const handleLogin = async () => {
     try {
       if (email && password) {
@@ -30,15 +32,26 @@ const Login: React.FC = () => {
         history.push('/home');
       }
     } catch (error) {
-      setToastMessage('Login failed. Please try again.');
+      setToastMessage('Login failed. Please try again. If you are not registered yet, click on Register button.');
       setShowToast(true);
     }
   };
 
+  // Function to handle user registration
   const handleRegister = async () => {
     try {
       if (email && password) {
-        await createUserWithEmailAndPassword(auth, email, password);
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
+
+        // Create a new user document in Firestore with default values
+        await setDoc(doc(db, 'users', user.uid), {
+          "First Name": 'Not Specified',
+          "Last Name": 'Not Specified',
+          "Time Deviation": 5,  // Set to 5 minutes
+          "Distance Deviation": 5  // Set to 5 miles
+        });
+
         history.push('/home');
       }
     } catch (error) {
@@ -51,7 +64,7 @@ const Login: React.FC = () => {
     <IonPage>
       <IonContent className="ion-padding">
         <IonItem>
-          <IonLabel>Email</IonLabel>
+          <IonLabel>Email:    </IonLabel>
           <IonInput
             value={email}
             type="email"
@@ -59,7 +72,7 @@ const Login: React.FC = () => {
           />
         </IonItem>
         <IonItem>
-          <IonLabel>Password</IonLabel>
+          <IonLabel>Password:    </IonLabel>
           <IonInput
             value={password}
             type="password"
