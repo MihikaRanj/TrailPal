@@ -77,7 +77,8 @@ const Login: React.FC = () => {
           "First Name": 'Not Specified',
           "Last Name": 'Not Specified',
           "Time Deviation": 5,
-          "Distance Deviation": 5
+          "Distance Deviation": 5,
+          email: email
         });
 
         // Request permission for notifications

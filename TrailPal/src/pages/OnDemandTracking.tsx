@@ -131,6 +131,7 @@ const startTracking = async () => {
   loadData();
   console.log(currentRoute);
   console.log(currentContact);
+  console.log(fcmToken);
   // Ensure that currentRoute and currentContact are fully loaded
   if (!currentRoute || !currentContact || !fcmToken) {
     console.log('Route or contact data missing, tracking cannot start.');
@@ -289,6 +290,7 @@ const sendNotificationToContact = async (type: string, data: any) => {
     const functions = getFunctions(); // Get Firebase Functions instance
     const sendNotification = httpsCallable(functions, 'sendNotification'); // Call the cloud function
 
+    console.log(payload);
     // Send the notification payload
     const result = await sendNotification(payload);
     console.log('Notification sent:', result.data);
