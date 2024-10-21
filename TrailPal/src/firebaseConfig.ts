@@ -18,4 +18,4 @@ const app = initializeApp(firebaseConfig);
 
 export const auth = getAuth(app);
 export const db = getFirestore(app);
-const messaging = getMessaging(app); // Initialize Messaging
+export const messaging = getMessaging(app); // Initialize Messaging
