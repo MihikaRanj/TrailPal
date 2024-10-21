@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { IonContent, IonPage, IonHeader, IonToolbar, IonTitle, IonSelect, IonSelectOption, IonItem, IonLabel, IonButtons, IonButton, IonIcon, IonFooter, IonModal, IonToast } from '@ionic/react';
 import { useHistory } from 'react-router';
 import BottomBar from '../components/BottomBar';
-import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, setDoc } from 'firebase/firestore';
+import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, query, setDoc, where } from 'firebase/firestore';
 import { auth, db } from '../firebaseConfig';
 import { arrowBack, refreshOutline } from 'ionicons/icons';
 import ContactForm from '../components/ContactForm';
@@ -10,6 +10,7 @@ import { useIonViewWillEnter } from '@ionic/react';
 import { Geolocation } from '@capacitor/geolocation';
 import { findNearest, getDistance } from 'geolib';  // For distance calculation
 import './TrailPal.css';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 
 const OnDemandTracking: React.FC = () => {
   const history = useHistory();
@@ -34,6 +35,7 @@ const OnDemandTracking: React.FC = () => {
   const [currentRoute, setCurrentRoute] = useState<any>(null);
   const [currentContact, setCurrentContact] = useState<any>(null);
   const [watchId, setWatchId] = useState<string | null>(null);  // Store the watch ID for stopping the tracking
+  const [fcmToken, setFcmToken] = useState<string | null>(null); // Store FCM token for the contact
 
   const user = auth.currentUser;
 
@@ -62,6 +64,8 @@ const OnDemandTracking: React.FC = () => {
             phone: contactData.phone,
             email: contactData.email
           });
+          // Fetch the FCM token for this contact based on their email
+          await fetchContactFcmToken(contactData.email);
         }
       }
       setLoading(false);
@@ -70,6 +74,19 @@ const OnDemandTracking: React.FC = () => {
     fetchRouteData();
   }, [user]);
 
+    // Function to fetch FCM token for the contact using their email
+    const fetchContactFcmToken = async (email: string) => {
+      const contactQuery = query(collection(db, 'users'), where('email', '==', email));
+      const querySnapshot = await getDocs(contactQuery);
+      if (!querySnapshot.empty) {
+        const contactDoc = querySnapshot.docs[0];
+        const contactData = contactDoc.data();
+        setFcmToken(contactData.fcmToken || null);
+        console.log('FCM token retrieved:', contactData.fcmToken);
+      } else {
+        console.log('No user found with email:', email);
+      }
+    };
   // Load route and contact data on view enter
   useIonViewWillEnter(() => {
     loadData();
@@ -112,8 +129,10 @@ const OnDemandTracking: React.FC = () => {
 
 const startTracking = async () => {
   loadData();
+  console.log(currentRoute);
+  console.log(currentContact);
   // Ensure that currentRoute and currentContact are fully loaded
-  if (!currentRoute || !currentContact) {
+  if (!currentRoute || !currentContact || !fcmToken) {
     console.log('Route or contact data missing, tracking cannot start.');
     return;
   }
@@ -254,16 +273,64 @@ const stopTracking = () => {
   };
   
   
-  // Send notification to the contact user
-  const sendNotificationToContact = async (type: string, data: any) => {
-    const payload = {
-      type,
-      message: buildNotificationMessage(type, data),
-      recipientEmail: contact?.email,
-    };
-    console.log(payload);
-    //await sendInAppNotification(payload); // Assuming this sends the notification
+// OnDemandTracking.tsx (Updates for error handling)
+const sendNotificationToContact = async (type: string, data: any) => {
+  if (!fcmToken) {
+    console.log('FCM token is missing. Cannot send notification.');
+    return;
+  }
+
+  const payload = {
+    fcmToken,
+    message: buildNotificationMessage(type, data),
   };
+
+  try {
+    const functions = getFunctions(); // Get Firebase Functions instance
+    const sendNotification = httpsCallable(functions, 'sendNotification'); // Call the cloud function
+
+    // Send the notification payload
+    const result = await sendNotification(payload);
+    console.log('Notification sent:', result.data);
+
+    // Handle token error cases (invalid or expired token)
+    if (result.data.error && result.data.error.code === 'messaging/invalid-registration-token') {
+      console.log('FCM token is invalid. Attempting to refresh token.');
+
+      // Refresh FCM token logic
+      const refreshedToken = await refreshContactFcmToken();
+      if (refreshedToken) {
+        // Retry sending the notification with the refreshed token
+        const retryPayload = {
+          fcmToken: refreshedToken,
+          message: buildNotificationMessage(type, data),
+        };
+        await sendNotification(retryPayload);
+        console.log('Retry notification sent successfully.');
+      }
+    }
+  } catch (error) {
+    console.error('Error sending notification:', error);
+  }
+};
+
+// Function to refresh contact FCM token (this will refresh token and update Firestore if needed)
+const refreshContactFcmToken = async () => {
+  try {
+    const userDoc = await getDoc(doc(db, 'users', currentContact.id));
+    if (userDoc.exists()) {
+      const newToken = userDoc.data()?.fcmToken;
+      if (newToken) {
+        setFcmToken(newToken); // Update the local state
+        console.log('FCM token refreshed:', newToken);
+        return newToken;
+      }
+    }
+  } catch (error) {
+    console.error('Error refreshing FCM token:', error);
+  }
+  return null;
+};
 
   const buildNotificationMessage = (type: string, data: any) => {
     switch (type) {
