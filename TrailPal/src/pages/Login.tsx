@@ -16,6 +16,7 @@ import {
   createUserWithEmailAndPassword,
 } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore'; // Firestore functions
+import { getMessaging, getToken } from "firebase/messaging"; // Firebase messaging for FCM
 
 const Login: React.FC = () => {
   const [email, setEmail] = useState<string>();
@@ -37,7 +38,7 @@ const Login: React.FC = () => {
     }
   };
 
-  // Function to handle user registration
+  // Function to handle user registration and notification permission
   const handleRegister = async () => {
     try {
       if (email && password) {
@@ -52,6 +53,17 @@ const Login: React.FC = () => {
           "Distance Deviation": 5  // Set to 5 miles
         });
 
+        // Request permission for notifications
+        const permissionGranted = await askNotificationPermission();
+        if (permissionGranted) {
+          const fcmToken = await getFCMToken();
+          if (fcmToken) {
+            // Store the FCM token in Firestore
+            await setDoc(doc(db, 'users', user.uid), { fcmToken }, { merge: true });
+            console.log("FCM Token saved:", fcmToken);
+          }
+        }
+
         history.push('/home');
       }
     } catch (error) {
@@ -60,11 +72,35 @@ const Login: React.FC = () => {
     }
   };
 
+  // Function to ask for notification permission
+  const askNotificationPermission = async (): Promise<boolean> => {
+    try {
+      const messaging = getMessaging();
+      const token = await Notification.requestPermission();
+      return token === 'granted';
+    } catch (error) {
+      console.error('Notification permission error:', error);
+      return false;
+    }
+  };
+
+  // Function to generate FCM token
+  const getFCMToken = async (): Promise<string | null> => {
+    try {
+      const messaging = getMessaging();
+      const token = await getToken(messaging, { vapidKey: "BKSk3Nkr65Q9epzcbohyoWLqsPYv-TE_-216O4WAq4Tj469SWJDOkh6d-4Qdn7wMUtCRy9hWpTxl-P0qQgcj-wA" });
+      return token;
+    } catch (error) {
+      console.error('Error getting FCM token:', error);
+      return null;
+    }
+  };
+
   return (
     <IonPage>
       <IonContent className="ion-padding">
         <IonItem>
-          <IonLabel>Email:    </IonLabel>
+          <IonLabel>Email: </IonLabel>
           <IonInput
             value={email}
             type="email"
@@ -72,7 +108,7 @@ const Login: React.FC = () => {
           />
         </IonItem>
         <IonItem>
-          <IonLabel>Password:    </IonLabel>
+          <IonLabel>Password: </IonLabel>
           <IonInput
             value={password}
             type="password"
