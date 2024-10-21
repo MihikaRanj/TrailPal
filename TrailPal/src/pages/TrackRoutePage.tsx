@@ -55,7 +55,11 @@ const TrackRoutePage: React.FC = () => {
 
            
           </IonRouterOutlet>
-          <IonLabel>Write Instructions here!</IonLabel>
+          <IonLabel>Welcome to the Track Route page! To start tracking, first go to the CREATE ROUTE page. Over here 
+            you wll get the opportunity to make your own route or use an already saved route. After pressing the NEW 
+            ROUTE button, you will be moved to page in which you will have to fill out information necessary to creating
+            your path. Once you have finished the 
+          </IonLabel>
         </IonTabs>
 
         
