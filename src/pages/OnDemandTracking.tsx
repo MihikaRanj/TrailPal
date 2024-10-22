@@ -10,7 +10,7 @@ import { useIonViewWillEnter } from '@ionic/react';
 import { Geolocation } from '@capacitor/geolocation';
 import { findNearest, getDistance } from 'geolib';  // For distance calculation
 import './TrailPal.css';
-import { getFunctions, httpsCallable } from 'firebase/functions';
+import { SMS } from '@awesome-cordova-plugins/sms';
 
 const OnDemandTracking: React.FC = () => {
   const history = useHistory();
@@ -35,7 +35,6 @@ const OnDemandTracking: React.FC = () => {
   const [currentRoute, setCurrentRoute] = useState<any>(null);
   const [currentContact, setCurrentContact] = useState<any>(null);
   const [watchId, setWatchId] = useState<string | null>(null);  // Store the watch ID for stopping the tracking
-  const [fcmToken, setFcmToken] = useState<string | null>(null); // Store FCM token for the contact
 
   const user = auth.currentUser;
 
@@ -64,8 +63,6 @@ const OnDemandTracking: React.FC = () => {
             phone: contactData.phone,
             email: contactData.email
           });
-          // Fetch the FCM token for this contact based on their email
-          await fetchContactFcmToken(contactData.email);
         }
       }
       setLoading(false);
@@ -74,19 +71,7 @@ const OnDemandTracking: React.FC = () => {
     fetchRouteData();
   }, [user]);
 
-    // Function to fetch FCM token for the contact using their email
-    const fetchContactFcmToken = async (email: string) => {
-      const contactQuery = query(collection(db, 'users'), where('email', '==', email));
-      const querySnapshot = await getDocs(contactQuery);
-      if (!querySnapshot.empty) {
-        const contactDoc = querySnapshot.docs[0];
-        const contactData = contactDoc.data();
-        setFcmToken(contactData.fcmToken || null);
-        console.log('FCM token retrieved:', contactData.fcmToken);
-      } else {
-        console.log('No user found with email:', email);
-      }
-    };
+
   // Load route and contact data on view enter
   useIonViewWillEnter(() => {
     loadData();
@@ -131,9 +116,8 @@ const startTracking = async () => {
   loadData();
   console.log(currentRoute);
   console.log(currentContact);
-  console.log(fcmToken);
   // Ensure that currentRoute and currentContact are fully loaded
-  if (!currentRoute || !currentContact || !fcmToken) {
+  if (!currentRoute || !currentContact) {
     console.log('Route or contact data missing, tracking cannot start.');
     return;
   }
@@ -152,15 +136,21 @@ const startTracking = async () => {
 
 const trackLocation = async () => {
   const routePath = getRoutePath(); // Helper function to build the path from start, stops, to end
+  let intervalId: any;  // Variable to store the interval ID for clearing it later
 
-  const watchId = await Geolocation.watchPosition({}, async (position) => {
-    const { latitude, longitude } = position?.coords;
+  const estimatedTime = currentRoute.estimatedTime || 5; // Default to 5 minutes if not defined
+  console.log('Estimated Time (in minutes):', estimatedTime);
+
+  // Function to check the user's location every 30 seconds
+  const checkPosition = async () => {
+    const position = await getCurrentLocation(); // Get current location
+    const { latitude, longitude } = position;
     const currentLocation = { latitude, longitude };
 
     if (!latitude || !longitude || !routePath.length) return; // Ensure valid data
 
-    console.log('checking deviationalert');
-    console.log(watchId);
+    console.log('Checking position at interval:', intervalId);
+    
     // Check if the user deviates from the path
     if (!deviationAlertSent && !isOnRoute(currentLocation, routePath)) {
       setDeviationAlertSent(true);
@@ -169,36 +159,45 @@ const trackLocation = async () => {
       });
     }
 
-    console.log('checking hasReachedDestination');
     // Check if the user has reached the destination
     if (hasReachedDestination(currentLocation)) {
+      console.log('Reached destination, stopping tracking.');
       await sendNotificationToContact('reached-destination', {
         location: currentLocation,
       });
-      stopTracking();
+      stopTracking(intervalId); // Stop tracking if the destination is reached
+    }
+  };
+
+  // Start an interval to check the user's location every 30 seconds
+  intervalId = setInterval(checkPosition, 30000);
+  setWatchId(intervalId); // Store the interval ID to clear it when needed
+
+  console.log(`Tracking started. Estimated Time: ${estimatedTime} min`);
+
+  // Set a timeout to stop tracking after the estimated time + 5-minute buffer
+  const totalTime = (estimatedTime + 5) * 60 * 1000; // Convert minutes to milliseconds
+  console.log(`Timeout set for: ${totalTime / 60000} minutes (Estimated Time + Buffer)`);
+
+  setTimeout(async () => {
+    console.log('Timeout reached, checking if the user reached the destination.');
+
+    const currentLocation = await getCurrentLocation(); // Get the latest position
+    if (!hasReachedDestination(currentLocation)) {
+      await sendNotificationToContact('late-arrival', {
+        location: currentLocation,
+      });
+      console.log('User did not reach the destination, stopping tracking.');
     }
 
-    console.log('checking setTimeout');
-    // Check if the user is late
-    setTimeout(async () => {
-      if (!hasReachedDestination(await getCurrentLocation())) {
-        await sendNotificationToContact('late-arrival', {
-          location: await getCurrentLocation(),
-        });
-        console.log('inside settimeout');
-        stopTracking();
-      }
-    }, (currentRoute.estimatedTime + 1) * 60 * 1000); // Estimated time + buffer- here 1 is bufferTime in minutes
-  });
-
-  setWatchId(watchId);  // Store the watch ID to stop tracking later
+    stopTracking(intervalId); // Stop tracking when the timeout is reached
+  }, totalTime); // Estimated time + buffer
 };
 
-
-
-const stopTracking = () => {
-  if (watchId) {
-    Geolocation.clearWatch({ id: watchId });
+const stopTracking = (id: any) => {
+  console.log(`Stopping tracking. Clearing interval: ${id}`);
+  if (id) {
+    clearInterval(id); // Clear the interval when stopping tracking
     setWatchId(null);
   }
   setTracking(false);
@@ -217,8 +216,8 @@ const stopTracking = () => {
   // Helper to check if the user is on the route within a 5 mile range
   const isOnRoute = (currentLocation: any, routePath: any[]) => {
     console.log("isOnRoute");
-    console.log(currentLocation);
-    console.log(routePath);
+    //console.log(currentLocation);
+    //console.log(routePath);
     const closestPoint = findNearest(currentLocation, routePath);
     const distanceToRoute = getDistance(currentLocation, closestPoint);
     return distanceToRoute <= 8046.72; // 5 miles in meters
@@ -227,8 +226,8 @@ const stopTracking = () => {
   // Helper to check if the user has reached the destination
   const hasReachedDestination = (currentLocation: any) => {
     console.log("hasReachedDestination");
-    console.log(currentLocation);
-    console.log(currentRoute);
+    //console.log(currentLocation);
+    //console.log(currentRoute);
     const destination = {
       latitude: currentRoute.endlocation.lat,
       longitude: currentRoute.endlocation.lon,
@@ -240,6 +239,7 @@ const stopTracking = () => {
 
   // Helper to get the current user's location
   const getCurrentLocation = async () => {
+    console.log("getCurrentLocation");
     try {
       const position = await Geolocation.getCurrentPosition({
         enableHighAccuracy: true,  // Request high accuracy for better GPS results
@@ -274,65 +274,29 @@ const stopTracking = () => {
   };
   
   
-// OnDemandTracking.tsx (Updates for error handling)
+// Update the sendNotificationToContact function to send SMS
 const sendNotificationToContact = async (type: string, data: any) => {
-  if (!fcmToken) {
-    console.log('FCM token is missing. Cannot send notification.');
+  console.log(currentContact?.phone);
+  if (!currentContact?.phone) {
+    console.log('Phone number is missing. Cannot send SMS.');
     return;
   }
 
-  const payload = {
-    fcmToken,
-    message: buildNotificationMessage(type, data),
-  };
+  // Build the SMS message content
+  const message = buildNotificationMessage(type, data);
+
+  console.log(currentContact?.phone + ":"+ message);
 
   try {
-    const functions = getFunctions(); // Get Firebase Functions instance
-    const sendNotification = httpsCallable(functions, 'sendNotification'); // Call the cloud function
+    // Use the SMS plugin to send the message
+    await SMS.send(currentContact.phone, message);
 
-    console.log(payload);
-    // Send the notification payload
-    const result = await sendNotification(payload);
-    console.log('Notification sent:', result.data);
-
-    // Handle token error cases (invalid or expired token)
-    if (result.data.error && result.data.error.code === 'messaging/invalid-registration-token') {
-      console.log('FCM token is invalid. Attempting to refresh token.');
-
-      // Refresh FCM token logic
-      const refreshedToken = await refreshContactFcmToken();
-      if (refreshedToken) {
-        // Retry sending the notification with the refreshed token
-        const retryPayload = {
-          fcmToken: refreshedToken,
-          message: buildNotificationMessage(type, data),
-        };
-        await sendNotification(retryPayload);
-        console.log('Retry notification sent successfully.');
-      }
-    }
+    console.log(`SMS sent to ${currentContact.phone}:`, message);
   } catch (error) {
-    console.error('Error sending notification:', error);
+    console.error('Error sending SMS:', error);
   }
 };
 
-// Function to refresh contact FCM token (this will refresh token and update Firestore if needed)
-const refreshContactFcmToken = async () => {
-  try {
-    const userDoc = await getDoc(doc(db, 'users', currentContact.id));
-    if (userDoc.exists()) {
-      const newToken = userDoc.data()?.fcmToken;
-      if (newToken) {
-        setFcmToken(newToken); // Update the local state
-        console.log('FCM token refreshed:', newToken);
-        return newToken;
-      }
-    }
-  } catch (error) {
-    console.error('Error refreshing FCM token:', error);
-  }
-  return null;
-};
 
   const buildNotificationMessage = (type: string, data: any) => {
     switch (type) {
