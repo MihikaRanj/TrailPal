@@ -262,7 +262,7 @@ const stopTracking = (id: any) => {
       try {
         return await getCurrentLocation();
       } catch (error) {
-        if (error.code === 3 && retries > 0) {  // Handle timeout error
+        if (error instanceof Error && 'code' in error && (error as any).code === 3 && retries > 0) {
           console.log('Retrying location fetch...');
           retries -= 1;
         } else {
@@ -272,6 +272,7 @@ const stopTracking = (id: any) => {
     }
     throw new Error('Unable to get location after multiple attempts');
   };
+  
   
   
 // Update the sendNotificationToContact function to send SMS

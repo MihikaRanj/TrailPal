@@ -466,18 +466,18 @@ const CreateScheduledRoute: React.FC = () => {
 
          {/* Enable Tracking radio button */}
          <IonRadioGroup
-                  value={enableTracking} // This should control the state
-                  onIonChange={(e) => setEnableTracking(e.detail.value === 'true')}
-                >
-                  <IonItem>
-                    <IonLabel>Enable Tracking</IonLabel>
-                    <IonRadio slot="start" value="true" checked={enableTracking === true} />
-                  </IonItem>
-                  <IonItem>
-                    <IonLabel>Disable Tracking</IonLabel>
-                    <IonRadio slot="start" value="false" checked={enableTracking === false} />
-                  </IonItem>
-                </IonRadioGroup>
+  value={enableTracking ? 'true' : 'false'}  // Use string values to represent true/false
+  onIonChange={(e) => setEnableTracking(e.detail.value === 'true')}
+>
+  <IonItem>
+    <IonLabel>Enable Tracking</IonLabel>
+    <IonRadio slot="start" value="true" />
+  </IonItem>
+  <IonItem>
+    <IonLabel>Disable Tracking</IonLabel>
+    <IonRadio slot="start" value="false" />
+  </IonItem>
+</IonRadioGroup>
 
 
 
