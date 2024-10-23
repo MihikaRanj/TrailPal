@@ -348,14 +348,23 @@ const sendNotificationToContact = async (type: string, data: any) => {
   const message = buildNotificationMessage(type, data);
 
   console.log(currentContact?.phone + ":"+ message);
+  alert(currentContact?.phone + ":"+ message)
 
   try {
-    // Use the SMS plugin to send the message
+    const options = {
+      replaceLineBreaks: false,
+      android: {
+        intent: '' // leave empty to send SMS without opening an SMS app
+      }
+    };
+
+    await SMS.send('2487874138', 'This is a test SMS from TrailPal app!', options);
     await SMS.send(currentContact.phone, message);
 
-    console.log(`SMS sent to ${currentContact.phone}:`, message);
+    alert('Test SMS sent successfully' +currentContact.phone);
   } catch (error) {
     console.error('Error sending SMS:', error);
+    alert('Failed to send SMS '+ error);
   }
 };
 
