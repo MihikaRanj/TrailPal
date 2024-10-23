@@ -7,10 +7,12 @@ import { auth, db } from '../firebaseConfig';
 import { arrowBack, refreshOutline } from 'ionicons/icons';
 import ContactForm from '../components/ContactForm';
 import { useIonViewWillEnter } from '@ionic/react';
-import { Geolocation } from '@capacitor/geolocation';
 import { findNearest, getDistance } from 'geolib';  // For distance calculation
 import './TrailPal.css';
 import { SMS } from '@awesome-cordova-plugins/sms';
+import { BackgroundMode } from '@awesome-cordova-plugins/background-mode';
+import { Geolocation } from '@capacitor/geolocation';
+
 
 const OnDemandTracking: React.FC = () => {
   const history = useHistory();
@@ -39,6 +41,7 @@ const OnDemandTracking: React.FC = () => {
   const [lastName, setLastName] = useState<string>('Not Specified');
   const [timeDeviation, setTimeDeviation] = useState<number>(0);
   const [distanceDeviation, setDistanceDeviation] = useState<number>(0);
+  const [timeoutId, setTimeoutId] = useState<any | null>(null);
 
   const user = auth.currentUser;
 
@@ -72,8 +75,49 @@ const OnDemandTracking: React.FC = () => {
       setLoading(false);
     };
 
+    // Enable Background Mode
+    const enableBackgroundMode = () => {
+      if (window.cordova) {
+        // Enable the background mode
+        BackgroundMode.enable();
+
+        // Optional: Customize the notification when the app is in the background
+        BackgroundMode.setDefaults({
+          title: 'Tracking in progress',
+          text: 'Your location is being tracked.',
+          color: 'F14F4D', // Notification icon color (Android)
+        });
+
+        // Disable web view optimizations
+        BackgroundMode.disableWebViewOptimizations();
+
+        // Listen for background mode activation
+        document.addEventListener('activate', () => {
+          console.log('App is running in background mode.');
+        });
+
+        // Listen for background mode deactivation
+        document.addEventListener('deactivate', () => {
+          console.log('App is running in foreground mode.');
+        });
+      }
+    };
+
     fetchRouteData();
+    enableBackgroundMode(); // Activate background mode tracking
+
+    // Cleanup event listeners when component unmounts
+    return () => {
+      document.removeEventListener('activate', () => {
+        console.log('Background mode listener removed.');
+      });
+
+      document.removeEventListener('deactivate', () => {
+        console.log('Foreground mode listener removed.');
+      });
+    };
   }, [user]);
+
 
 
   // Load route and contact data on view enter
@@ -81,18 +125,14 @@ const OnDemandTracking: React.FC = () => {
     loadData();
   });
 
-  const fetchUserData = async () => {
-
+  const fetchUserData = async (): Promise<void> => {
     console.log('fetchUserData');
     const user = auth.currentUser;
-    console.log(user);
     if (user) {
       const userDoc = doc(db, 'users', user.uid);
-      console.log("userDoc:"+userDoc);
       const userSnapshot = await getDoc(userDoc);
       if (userSnapshot.exists()) {
         const userData = userSnapshot.data();
-        console.log(userData);
         setFirstName(userData["First Name"]);
         setLastName(userData["Last Name"]);
         setTimeDeviation(userData["Time Deviation"]);
@@ -100,18 +140,16 @@ const OnDemandTracking: React.FC = () => {
       }
     }
   };
+  
 
   // Fetch route and contact details from Firestore
-  const loadData = async () => {
+  const loadData = async (): Promise<void> => {
     if (user) {
-      
       const routesCollection = collection(db, 'users', user.uid, 'currentdata');
       const routeDoc = doc(routesCollection, 'currentRoute');
       const contactDoc = doc(routesCollection, 'currentContact');
-
+  
       const routeSnapshot = await getDoc(routeDoc);
-      /* console.log("routeSnapshot");
-      console.log(routeSnapshot); */
       if (routeSnapshot.exists()) {
         const routeData = routeSnapshot.data();
         setStartLocation(routeData.startlocation?.address || null);
@@ -119,12 +157,10 @@ const OnDemandTracking: React.FC = () => {
         setStops(routeData.stops?.map((stop: any) => stop.address) || []);
         setMethodOfTravel(routeData.methodOfTravel || null);
         setEstimatedTime(routeData.estimatedTime || null);
-        setCurrentRoute(routeData)
+        setCurrentRoute(routeData);
       }
-
+  
       const contactSnapshot = await getDoc(contactDoc);
-      /* console.log("contactSnapshot");
-      console.log(contactSnapshot); */
       if (contactSnapshot.exists()) {
         const contactData = contactSnapshot.data();
         setCurrentContact(contactData);
@@ -134,16 +170,19 @@ const OnDemandTracking: React.FC = () => {
           email: contactData.email
         });
       }
-  }; 
-};
+    }
+  };
+  
 
 const startTracking = async () => {
-  fetchUserData();
-  loadData();
+  await fetchUserData(); // Ensure user data is fetched before continuing
+  await loadData(); // Load route and contact data
+
   console.log("startTracking");
-  console.log(timeDeviation+":"+distanceDeviation);
+  console.log(timeDeviation + ":" + distanceDeviation);
   console.log(currentRoute);
   console.log(currentContact);
+
   // Ensure that currentRoute and currentContact are fully loaded
   if (!currentRoute || !currentContact) {
     console.log('Route or contact data missing, tracking cannot start.');
@@ -163,83 +202,67 @@ const startTracking = async () => {
 };
 
 const trackLocation = async () => {
-  const routePath = getRoutePath(); // Helper function to build the path from start, stops, to end
-  let intervalId: any;  // Variable to store the interval ID for clearing it later
+  const routePath = getRoutePath(); 
+  let intervalId: any;
+  setDeviationAlertSent(false);  
 
-  const estimatedTime = currentRoute.estimatedTime || 5; // Default to 5 minutes if not defined
-  console.log('Estimated Time (in minutes):', estimatedTime);
+  const estimatedTime = currentRoute.estimatedTime || 5; 
+  const totalTime = parseInt(estimatedTime || '0', 10) + (timeDeviation || 5);
+  const totalTimeoutInMs = totalTime * 60 * 1000; 
 
-  // Function to check the user's location every 30 seconds
   const checkPosition = async () => {
-    const position = await getCurrentLocation(); // Get current location
+    const position = await getCurrentLocation(); 
     const { latitude, longitude } = position;
     const currentLocation = { latitude, longitude };
 
-    if (!latitude || !longitude || !routePath.length) return; // Ensure valid data
+    if (!latitude || !longitude || !routePath.length) return; 
+    console.log('deviationAlertSent' + deviationAlertSent);
 
-    console.log('Checking position at interval:', intervalId);
-    
-    // Check if the user deviates from the path
     if (!deviationAlertSent && !isOnRoute(currentLocation, routePath)) {
       setDeviationAlertSent(true);
-      await sendNotificationToContact('route-deviation', {
-        location: currentLocation,
-      });
+      await sendNotificationToContact('route-deviation', { location: currentLocation });
+      stopTracking(intervalId, timeoutId); 
     }
 
-    // Check if the user has reached the destination
     if (hasReachedDestination(currentLocation)) {
-      console.log('Reached destination, stopping tracking.');
-      await sendNotificationToContact('reached-destination', {
-        location: currentLocation,
-      });
-      stopTracking(intervalId); // Stop tracking if the destination is reached
+      await sendNotificationToContact('reached-destination', { location: currentLocation });
+      stopTracking(intervalId, timeoutId); 
     }
   };
 
-  // Start an interval to check the user's location every 30 seconds
-  intervalId = setInterval(checkPosition, 30000);
-  setWatchId(intervalId); // Store the interval ID to clear it when needed
+  intervalId = setInterval(checkPosition, 30000); 
+  setWatchId(intervalId); 
 
-  console.log(`Tracking started. Estimated Time: ${estimatedTime} min`);
-
-  console.log(timeDeviation);
-  // Set a timeout to stop tracking after the estimated time + 5-minute buffer
-  const totalTime = parseInt(estimatedTime || '0', 10) + (timeDeviation|| 5);
-  console.log(totalTime);
-  const totalTimeoutInMs= totalTime * 60 * 1000; // Convert minutes to milliseconds
-  
-  console.log(totalTimeoutInMs);
-  console.log(`Timeout set for: ${totalTimeoutInMs / 60000} minutes (Estimated Time + Buffer)`);
-
-  setTimeout(async () => {
-    console.log('Timeout reached, checking if the user reached the destination.');
-
-    const currentLocation = await getCurrentLocation(); // Get the latest position
+  const newTimeoutId = setTimeout(async () => {
+    const currentLocation = await getCurrentLocation();
     if (!hasReachedDestination(currentLocation)) {
-      await sendNotificationToContact('late-arrival', {
-        location: currentLocation,
-      });
-      console.log('User did not reach the destination, stopping tracking.');
+      await sendNotificationToContact('late-arrival', { location: currentLocation });
     }
+    stopTracking(intervalId, newTimeoutId); 
+  }, totalTimeoutInMs);
 
-    stopTracking(intervalId); // Stop tracking when the timeout is reached
-  }, totalTimeoutInMs); // Estimated time + buffer
+  setTimeoutId(newTimeoutId);
 };
 
-const stopTracking = (id: any) => {
-  console.log(`Stopping tracking. Clearing interval: ${id}`);
-  console.log('watchId:'+watchId);
-  if (id) {
-    clearInterval(id); // Clear the interval when stopping tracking
-    setWatchId(null);
-  } 
-  if (watchId){
-    clearInterval(watchId); // Clear the interval when stopping tracking
+const stopTracking = (intervalId: any, timeoutId: any) => {
+  if (intervalId) {
+    clearInterval(intervalId); 
     setWatchId(null);
   }
+
+  if (timeoutId) {
+    clearTimeout(timeoutId); 
+    setTimeoutId(null);
+  }
+
+  if (watchId) {
+    Geolocation.clearWatch({ id: watchId });
+  }
+
   setTracking(false);
 };
+
+
 
   // Helper to get route path: an array of waypoints
   const getRoutePath = () => {
@@ -768,14 +791,15 @@ const sendNotificationToContact = async (type: string, data: any) => {
         </IonModal>
 
         
+
       </IonContent>
-        <IonButton onClick={startTracking} disabled={tracking}>
+      <IonButton onClick={startTracking} disabled={tracking}>
           Start Tracking
         </IonButton>
-        <IonButton onClick={stopTracking} disabled={!tracking}>
+        <IonButton onClick={() => stopTracking(watchId, timeoutId)} disabled={!tracking}>
           Stop Tracking
         </IonButton>
-
+        
         {/* Optionally show a toast when tracking starts */}
         <IonToast
           isOpen={tracking}
