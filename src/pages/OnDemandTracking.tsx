@@ -35,6 +35,10 @@ const OnDemandTracking: React.FC = () => {
   const [currentRoute, setCurrentRoute] = useState<any>(null);
   const [currentContact, setCurrentContact] = useState<any>(null);
   const [watchId, setWatchId] = useState<string | null>(null);  // Store the watch ID for stopping the tracking
+  const [firstName, setFirstName] = useState<string>('Not Specified');
+  const [lastName, setLastName] = useState<string>('Not Specified');
+  const [timeDeviation, setTimeDeviation] = useState<number>(0);
+  const [distanceDeviation, setDistanceDeviation] = useState<number>(0);
 
   const user = auth.currentUser;
 
@@ -77,9 +81,30 @@ const OnDemandTracking: React.FC = () => {
     loadData();
   });
 
+  const fetchUserData = async () => {
+
+    console.log('fetchUserData');
+    const user = auth.currentUser;
+    console.log(user);
+    if (user) {
+      const userDoc = doc(db, 'users', user.uid);
+      console.log("userDoc:"+userDoc);
+      const userSnapshot = await getDoc(userDoc);
+      if (userSnapshot.exists()) {
+        const userData = userSnapshot.data();
+        console.log(userData);
+        setFirstName(userData["First Name"]);
+        setLastName(userData["Last Name"]);
+        setTimeDeviation(userData["Time Deviation"]);
+        setDistanceDeviation(userData["Distance Deviation"]);
+      }
+    }
+  };
+
   // Fetch route and contact details from Firestore
   const loadData = async () => {
     if (user) {
+      
       const routesCollection = collection(db, 'users', user.uid, 'currentdata');
       const routeDoc = doc(routesCollection, 'currentRoute');
       const contactDoc = doc(routesCollection, 'currentContact');
@@ -113,7 +138,10 @@ const OnDemandTracking: React.FC = () => {
 };
 
 const startTracking = async () => {
+  fetchUserData();
   loadData();
+  console.log("startTracking");
+  console.log(timeDeviation+":"+distanceDeviation);
   console.log(currentRoute);
   console.log(currentContact);
   // Ensure that currentRoute and currentContact are fully loaded
@@ -175,9 +203,14 @@ const trackLocation = async () => {
 
   console.log(`Tracking started. Estimated Time: ${estimatedTime} min`);
 
+  console.log(timeDeviation);
   // Set a timeout to stop tracking after the estimated time + 5-minute buffer
-  const totalTime = (estimatedTime + 5) * 60 * 1000; // Convert minutes to milliseconds
-  console.log(`Timeout set for: ${totalTime / 60000} minutes (Estimated Time + Buffer)`);
+  const totalTime = parseInt(estimatedTime || '0', 10) + (timeDeviation|| 5);
+  console.log(totalTime);
+  const totalTimeoutInMs= totalTime * 60 * 1000; // Convert minutes to milliseconds
+  
+  console.log(totalTimeoutInMs);
+  console.log(`Timeout set for: ${totalTimeoutInMs / 60000} minutes (Estimated Time + Buffer)`);
 
   setTimeout(async () => {
     console.log('Timeout reached, checking if the user reached the destination.');
@@ -191,13 +224,18 @@ const trackLocation = async () => {
     }
 
     stopTracking(intervalId); // Stop tracking when the timeout is reached
-  }, totalTime); // Estimated time + buffer
+  }, totalTimeoutInMs); // Estimated time + buffer
 };
 
 const stopTracking = (id: any) => {
   console.log(`Stopping tracking. Clearing interval: ${id}`);
+  console.log('watchId:'+watchId);
   if (id) {
     clearInterval(id); // Clear the interval when stopping tracking
+    setWatchId(null);
+  } 
+  if (watchId){
+    clearInterval(watchId); // Clear the interval when stopping tracking
     setWatchId(null);
   }
   setTracking(false);
@@ -216,11 +254,11 @@ const stopTracking = (id: any) => {
   // Helper to check if the user is on the route within a 5 mile range
   const isOnRoute = (currentLocation: any, routePath: any[]) => {
     console.log("isOnRoute");
-    //console.log(currentLocation);
+    console.log("distanceDeviation"+distanceDeviation);
     //console.log(routePath);
     const closestPoint = findNearest(currentLocation, routePath);
     const distanceToRoute = getDistance(currentLocation, closestPoint);
-    return distanceToRoute <= 8046.72; // 5 miles in meters
+    return distanceToRoute <= distanceDeviation*1609.34; // convert miles in meters
   };
 
   // Helper to check if the user has reached the destination
@@ -302,13 +340,13 @@ const sendNotificationToContact = async (type: string, data: any) => {
   const buildNotificationMessage = (type: string, data: any) => {
     switch (type) {
       case 'tracking-started':
-        return `${user?.email} has started their journey. Route details: ${JSON.stringify(data.route)}`;
+        return `${firstName == 'Not Specified'?(user?.email):firstName} has started their journey. Route details: ${JSON.stringify(data.route)}`;
       case 'route-deviation':
-        return `${user?.email} has deviated from the planned route! Current location: ${JSON.stringify(data.location)}`;
+        return `${firstName == 'Not Specified'?(user?.email):firstName} has deviated from the planned route! Current location: ${JSON.stringify(data.location)}`;
       case 'reached-destination':
-        return `${user?.email} has safely reached the destination.`;
+        return `${firstName == 'Not Specified'?(user?.email):firstName} has safely reached the destination.`;
       case 'late-arrival':
-        return `${user?.email} has not arrived at the destination on time. Last known location: ${JSON.stringify(data.location)}`;
+        return `${firstName == 'Not Specified'?(user?.email):firstName} has not arrived at the destination on time. Last known location: ${JSON.stringify(data.location)}`;
       default:
         return '';
     }
@@ -405,10 +443,10 @@ const sendNotificationToContact = async (type: string, data: any) => {
           if (existingContactId) {
             const contactDoc = doc(savedContactsCollection, existingContactId);
             await setDoc(contactDoc, newContact, { merge: true });
-            alert('Contact updated successfully!');
+            //alert('Contact updated successfully!');
           } else {
             await addDoc(savedContactsCollection, newContact);
-            alert('Contact saved successfully to saved contacts!');
+            //alert('Contact saved successfully to saved contacts!');
           }
 
          
@@ -596,7 +634,7 @@ const sendNotificationToContact = async (type: string, data: any) => {
         )}
         {estimatedTime && (
           <IonItem>
-            <IonLabel>Estimated Time: {estimatedTime}</IonLabel>
+            <IonLabel>Estimated Time (minutes): {estimatedTime}</IonLabel>
           </IonItem>
         )}
 
@@ -715,7 +753,7 @@ const sendNotificationToContact = async (type: string, data: any) => {
             {savedRoutes.map(route => (
               <IonItem key={route.id} onClick={() => setSelectedSavedRoute(route)}
               color={selectedSavedRoute?.id === route.id ? 'medium' : 'light'}>
-                <IonLabel>{route.startlocation.address} to {route.endlocation.address}</IonLabel>
+                <IonLabel>From: [{route.startlocation.address}], To: [{route.endlocation.address}], Estimated Time: [{route.estimatedTime}]</IonLabel>
               </IonItem>
             ))}
           </IonContent>

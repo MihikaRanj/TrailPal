@@ -40,7 +40,6 @@ import '@ionic/react/css/palettes/dark.system.css';
 /* Theme variables */
 import './theme/variables.css';
 import MapPage from './pages/MapPage';
-import RoutesPage from './pages/RoutesPage';
 import CreateRoutePage from './pages/CreateRoutePage';
 import TrackRoutePage from './pages/TrackRoutePage';
 import GeoFenceLocation from './pages/GeoFenceLocation';
@@ -71,7 +70,6 @@ const App: React.FC = () => {
             <Route path="/home" component={Home} exact />
             <Route path="/track-route" component={TrackRoutePage} exact />
             <Route path="/settings" component={Settings} exact />
-            <Route path="/routes" component={RoutesPage} exact />
             <Route path="/create-route" component={CreateRoutePage} />
             <Route path="/create-scheduled-route" component={CreateScheduledRoute} />
             <Route path="/view-update-scheduled-route" component={ViewUpdateScheduledRoute} />

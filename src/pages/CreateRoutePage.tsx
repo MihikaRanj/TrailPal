@@ -17,7 +17,7 @@ import {
 } from '@ionic/react';
 import { useHistory, useLocation } from 'react-router-dom';
 import { arrowBack, refreshOutline, carOutline, walkOutline } from 'ionicons/icons';
-import { doc, getDoc, setDoc, deleteDoc, collection, addDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc, collection, addDoc, getDocs } from 'firebase/firestore';
 import { db, auth } from '../firebaseConfig'; // Firestore config
 import BottomBar from '../components/BottomBar';
 
@@ -94,6 +94,7 @@ const CreateRoutePage: React.FC = () => {
           if (docSnapshot.exists()) {
             const routeData = docSnapshot.data(); // Retrieve the full route data from currentdata
   
+            // Create the route object
             const route = {
               startlocation: {
                 address: routeData.startlocation.address,
@@ -110,17 +111,48 @@ const CreateRoutePage: React.FC = () => {
                 lat: stop.lat,
                 lon: stop.lon,
               })),
-              methodOfTravel: methodOfTravel || 'Not specified', // Save method of travel
-              estimatedTime: estimatedTime + ' minutes', // Save estimated time
+              methodOfTravel: methodOfTravel || 'Not specified',
+              estimatedTime: estimatedTime,
               createdAt: new Date(),
             };
   
             const savedRoutesCollection = collection(db, 'users', user.uid, 'savedroutes');
-            await addDoc(savedRoutesCollection, route); // Save the complete route
+  
+            // Query all saved routes
+            const querySnapshot = await getDocs(savedRoutesCollection);
+            let existingRouteId: string | null = null;
+  
+            // Check if an identical route already exists
+            querySnapshot.forEach((doc) => {
+              const savedRoute = doc.data();
+  
+              const isSameRoute = 
+                savedRoute.startlocation.address === route.startlocation.address &&
+                savedRoute.endlocation.address === route.endlocation.address &&
+                JSON.stringify(savedRoute.stops) === JSON.stringify(route.stops) &&
+                savedRoute.methodOfTravel === route.methodOfTravel &&
+                savedRoute.estimatedTime === route.estimatedTime;
+  
+              if (isSameRoute) {
+                existingRouteId = doc.id;
+              }
+            });
+  
+            // If identical route found, update it
+            if (existingRouteId) {
+              const existingRouteDoc = doc(savedRoutesCollection, existingRouteId);
+              await setDoc(existingRouteDoc, route, { merge: true });
+            } else {
+              // If no identical route found, add a new one
+              await addDoc(savedRoutesCollection, route);
+              //alert('Route saved successfully!');
+            }
+  
           } else {
             alert('Failed to retrieve current route data.');
           }
         }
+        handleBack();
       } catch (error) {
         console.error('Error saving route:', error);
         alert('Failed to save the route. Please try again.');
@@ -129,6 +161,7 @@ const CreateRoutePage: React.FC = () => {
       alert('Please enter both start and end locations, and the estimated journey time.');
     }
   };
+  
   
   const handleFieldUpdate = async (field: string, value: any) => {
     if (user) {
@@ -192,19 +225,31 @@ const CreateRoutePage: React.FC = () => {
       </IonHeader>
       
       <IonContent>
-        <IonItem>
-          <IonLabel>Start Location (required): {startLocation || 'Not Selected'}</IonLabel>
-          <IonButton expand="block" onClick={() => history.push({pathname: '/map/start',state: { from: locationState.state?.from }})}>
-            Select Starting Location
+      {startLocation ? (
+          <IonItem>
+            <IonLabel>Start Location: {startLocation}</IonLabel>
+          </IonItem>
+        ) : (
+          <IonItem>
+            <IonButton expand="block" onClick={() => history.push({pathname: '/map/start',state: { from: locationState.state?.from }})}>
+            Select Starting Location (required)
           </IonButton>
-        </IonItem>
+          </IonItem>
+      )}
 
-        <IonItem>
-          <IonLabel>End Location (required): {endLocation || 'Not Selected'}</IonLabel>
-          <IonButton expand="block" onClick={() => history.push({pathname: '/map/end',state: { from: locationState.state?.from }})}>
-            Select Ending Location
+      
+        {endLocation ? (
+          <IonItem>
+            <IonLabel>End Location: {endLocation}</IonLabel>
+          </IonItem>
+        ) : (
+
+          <IonItem lines="none" style={{ display: 'flex', justifyContent: 'center' }}>
+            <IonButton expand="block" onClick={() => history.push({pathname: '/map/end',state: { from: locationState.state?.from }})}>
+            Select Ending Location (required)
           </IonButton>
-        </IonItem>
+          </IonItem>
+        )}
 
         {stops.map((stop, index) => (
           <IonItem key={index}>
@@ -246,7 +291,8 @@ const CreateRoutePage: React.FC = () => {
               handleFieldUpdate('estimatedTime', e.detail.value!); // Update Firestore when entered
             }}
             required
-            placeholder="Enter time in minutes" // Placeholder to indicate the expected input
+            placeholder="minutes"
+            style={{ width: '100px', marginLeft: 'auto' }} // Ensure input is compact and right-aligned
           />
         </IonItem>
       </IonContent>

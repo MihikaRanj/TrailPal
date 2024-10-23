@@ -218,10 +218,8 @@ const CreateScheduledRoute: React.FC = () => {
           if (existingContactId) {
             const contactDoc = doc(savedContactsCollection, existingContactId);
             await setDoc(contactDoc, newContact, { merge: true });
-            alert('Contact updated successfully!');
           } else {
             await addDoc(savedContactsCollection, newContact);
-            alert('Contact saved successfully to saved contacts!');
           }
 
           
@@ -416,7 +414,7 @@ const CreateScheduledRoute: React.FC = () => {
         )}
         {estimatedTime && (
           <IonItem>
-            <IonLabel>Estimated Time: {estimatedTime}</IonLabel>
+            <IonLabel>Estimated Time (minutes): {estimatedTime}</IonLabel>
           </IonItem>
         )}
 
@@ -561,7 +559,7 @@ const CreateScheduledRoute: React.FC = () => {
             {savedRoutes.map(route => (
               <IonItem key={route.id} onClick={() => setSelectedSavedRoute(route)}
               color={selectedSavedRoute?.id === route.id ? 'medium' : 'light'}>
-                <IonLabel>{route.startlocation.address} to {route.endlocation.address}</IonLabel>
+                <IonLabel>From: [{route.startlocation.address}], To: [{route.endlocation.address}], Estimated Time: [{route.estimatedTime}]</IonLabel>
               </IonItem>
             ))}
           </IonContent>
