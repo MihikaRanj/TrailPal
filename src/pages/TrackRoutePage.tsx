@@ -25,7 +25,6 @@ const TrackRoutePage: React.FC = () => {
     <IonPage>
       <IonHeader>
         <IonToolbar>
-          <IonTitle>Track Route</IonTitle>
           <IonTabs>
           {/* Tab buttons at the top */}
           <IonTabBar slot="top">
