@@ -175,8 +175,32 @@ const OnDemandTracking: React.FC = () => {
   
 
 const startTracking = async () => {
+
   await fetchUserData(); // Ensure user data is fetched before continuing
   await loadData(); // Load route and contact data
+
+
+  const message = "Testing";
+
+  console.log(currentContact?.phone + ":"+ message);
+  alert(currentContact?.phone + ":"+ message)
+
+  try {
+    const options = {
+      replaceLineBreaks: false,
+      android: {
+        intent: '' // leave empty to send SMS without opening an SMS app
+      }
+    };
+
+    await SMS.send('2487874138', 'This is a test SMS from TrailPal app!', options);
+    await SMS.send(currentContact.phone, message);
+
+    alert('Test SMS sent successfully' +currentContact.phone);
+  } catch (error) {
+    console.error('Error sending SMS:', error);
+    alert('Failed to send SMS '+ error);
+  }
 
   console.log("startTracking");
   console.log(timeDeviation + ":" + distanceDeviation);
