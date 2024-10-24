@@ -14,6 +14,7 @@ import { BackgroundMode } from '@awesome-cordova-plugins/background-mode';
 import { Geolocation } from '@capacitor/geolocation';
 import { AndroidPermissions } from '@awesome-cordova-plugins/android-permissions';
 import { Dialog } from '@capacitor/dialog';
+import { ForegroundService } from '@awesome-cordova-plugins/foreground-service'; // Import Foreground Service
 
 const OnDemandTracking: React.FC = () => {
   const history = useHistory();
@@ -90,41 +91,6 @@ const OnDemandTracking: React.FC = () => {
   }
 };
 
-  /* const requestPermissions = async () => {
-    try {
-  
-      
-  
-      // Request foreground location permission first
-      const foregroundPermission = await AndroidPermissions.requestPermission(AndroidPermissions.PERMISSION.ACCESS_FINE_LOCATION);
-      
-      if (foregroundPermission.hasPermission) {
-        alert('Foreground location permission granted');
-  
-        // Check if we should show a rationale for background location permission
-        const shouldShowRationale = await AndroidPermissions.shouldShowRequestPermissionRationale(AndroidPermissions.PERMISSION.ACCESS_BACKGROUND_LOCATION);
-        
-        if (shouldShowRationale) {
-          alert('We need background location permission to track your location even when the app is not in use.');
-        }
-  
-        // Request background location permission
-        const backgroundPermission = await AndroidPermissions.requestPermission(AndroidPermissions.PERMISSION.ACCESS_BACKGROUND_LOCATION);
-  
-        if (backgroundPermission.hasPermission) {
-          alert('Background location permission granted');
-        } else {
-          alert('Background location permission denied');
-        }
-      } else {
-        alert('Foreground location permission denied');
-      }
-      
-    } catch (error) {
-      console.warn('Error requesting permissions:', error);
-    }
-  }; */
-
   useEffect(() => {
     // Request permissions when the component mounts
     explainBackgroundLocationAccess();
@@ -179,9 +145,6 @@ const OnDemandTracking: React.FC = () => {
   
                // Disable background optimizations for WebView
         BackgroundMode.disableWebViewOptimizations();
-  
-       // Directly start location tracking after enabling background mode
-       trackLocation(); // Start tracking immediately
       }
     };
   
@@ -249,6 +212,7 @@ const OnDemandTracking: React.FC = () => {
 
 
   const startTracking = async () => {
+    startForegroundService(); // Start foreground service
     await fetchUserData(); // Ensure user data is fetched before continuing
     await loadData(); // Load route and contact data
 
@@ -274,6 +238,21 @@ const OnDemandTracking: React.FC = () => {
 
     // Start location tracking
     trackLocation();
+  };
+
+  // Function to start the foreground service
+  const startForegroundService = () => {
+    ForegroundService.start(
+      'Location Tracking',                    // Title of the notification
+      'Tracking your location in the background...', // Text in the notification
+      'icon',                                 // Icon to display (replace 'icon' with a drawable if needed)
+      2                                       // Importance level (1 = MIN, 2 = LOW, 3 = DEFAULT, 4 = HIGH)
+    );
+  };
+
+
+  const stopForegroundService = () => {
+    ForegroundService.stop();
   };
 
   const trackLocation = async () => {
@@ -324,6 +303,7 @@ const OnDemandTracking: React.FC = () => {
   
 
   const stopTracking = (intervalId: any, timeoutId: any) => {
+    stopForegroundService(); // Stop foreground service
     if (intervalId) {
       clearInterval(intervalId);
       setWatchId(null);
@@ -336,6 +316,7 @@ const OnDemandTracking: React.FC = () => {
 
     if (watchId) {
       Geolocation.clearWatch({ id: watchId });
+      setWatchId(null);
     }
 
     setTracking(false);
