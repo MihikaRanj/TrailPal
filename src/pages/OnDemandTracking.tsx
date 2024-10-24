@@ -58,18 +58,23 @@ const OnDemandTracking: React.FC = () => {
     const backgroundPermission = await AndroidPermissions.requestPermission(AndroidPermissions.PERMISSION.ACCESS_BACKGROUND_LOCATION);
 
     if (backgroundPermission.hasPermission) {
-      alert('Background location permission granted');
+      //alert('Background location permission granted');
     } else {
-      alert('Background location permission denied');
-    }
-
+        //await openSettings();  // Direct the user to settings to enable background location access
+      }
   };
 
   const explainBackgroundLocationAccess = async () => {
+
+    const smsPermission = await AndroidPermissions.checkPermission(AndroidPermissions.PERMISSION.SEND_SMS);
+    if (!smsPermission.hasPermission) {
+      const smsGranted = AndroidPermissions.requestPermission(AndroidPermissions.PERMISSION.SEND_SMS);
+    }
+
     const foregroundPermission = await AndroidPermissions.requestPermission(AndroidPermissions.PERMISSION.ACCESS_FINE_LOCATION);
 
     if (foregroundPermission.hasPermission) {
-      alert('Foreground location permission granted');
+      //alert('Foreground location permission granted');
 
       const { value } = await Dialog.confirm({
         title: 'Location Access Required',
@@ -79,16 +84,16 @@ const OnDemandTracking: React.FC = () => {
       if (value) {
         // Proceed with requesting background location permission
         await requestLocationPermissions();
-      }
     } else {
-      alert('Foreground location permission denied');
+      //alert('Foreground location permission denied');
     }
-  };
+  }
+};
 
   /* const requestPermissions = async () => {
     try {
   
-      const smsPermission = await AndroidPermissions.checkPermission(AndroidPermissions.PERMISSION.SEND_SMS);
+      
   
       // Request foreground location permission first
       const foregroundPermission = await AndroidPermissions.requestPermission(AndroidPermissions.PERMISSION.ACCESS_FINE_LOCATION);
@@ -114,96 +119,79 @@ const OnDemandTracking: React.FC = () => {
       } else {
         alert('Foreground location permission denied');
       }
-      if (!smsPermission.hasPermission) {
-        const smsGranted = AndroidPermissions.requestPermission(AndroidPermissions.PERMISSION.SEND_SMS);
-      }
+      
     } catch (error) {
       console.warn('Error requesting permissions:', error);
     }
   }; */
 
-
   useEffect(() => {
     // Request permissions when the component mounts
     explainBackgroundLocationAccess();
+     // Fetch user data and route information
+     fetchUserData();
 
-    // Fetch user data and route information
-    fetchUserData();
-
-    const fetchRouteData = async () => {
-      if (user) {
-        const routesCollection = collection(db, 'users', user.uid, 'currentdata');
-        const routeDoc = doc(routesCollection, 'currentRoute');
-        const contactDoc = doc(routesCollection, 'currentContact');
-
-        const routeSnapshot = await getDoc(routeDoc);
-        if (routeSnapshot.exists()) {
-          const routeData = routeSnapshot.data();
-          setStartLocation(routeData.startlocation?.address || null);
-          setEndLocation(routeData.endlocation?.address || null);
-          setStops(routeData.stops?.map((stop: any) => stop.address) || []);
-          setMethodOfTravel(routeData.methodOfTravel || null);
-          setEstimatedTime(routeData.estimatedTime || null);
-        }
-
-        const contactSnapshot = await getDoc(contactDoc);
-        if (contactSnapshot.exists()) {
-          const contactData = contactSnapshot.data();
-          setContact({
-            name: contactData.name,
-            phone: contactData.phone,
-            email: contactData.email
-          });
-        }
-      }
-      setLoading(false);
-    };
-
+     const fetchRouteData = async () => {
+       if (user) {
+         const routesCollection = collection(db, 'users', user.uid, 'currentdata');
+         const routeDoc = doc(routesCollection, 'currentRoute');
+         const contactDoc = doc(routesCollection, 'currentContact');
+ 
+         const routeSnapshot = await getDoc(routeDoc);
+         if (routeSnapshot.exists()) {
+           const routeData = routeSnapshot.data();
+           setStartLocation(routeData.startlocation?.address || null);
+           setEndLocation(routeData.endlocation?.address || null);
+           setStops(routeData.stops?.map((stop: any) => stop.address) || []);
+           setMethodOfTravel(routeData.methodOfTravel || null);
+           setEstimatedTime(routeData.estimatedTime || null);
+         }
+ 
+         const contactSnapshot = await getDoc(contactDoc);
+         if (contactSnapshot.exists()) {
+           const contactData = contactSnapshot.data();
+           setContact({
+             name: contactData.name,
+             phone: contactData.phone,
+             email: contactData.email
+           });
+         }
+       }
+       setLoading(false);
+     };
+ 
+    fetchRouteData();
+  
     // Enable Background Mode
     const enableBackgroundMode = () => {
+      alert('Inside enableBackgroundMode');
       if (window.cordova) {
-        // Enable the background mode
+        alert('Inside cordova');
+        // Enable background mode
         BackgroundMode.enable();
-
+  
         // Optional: Customize the notification when the app is in the background
         BackgroundMode.setDefaults({
           title: 'Tracking in progress',
           text: 'Your location is being tracked in the background.',
-          color: 'F14F4D', // Notification icon color (Android)
+          color: 'F14F4D',
         });
-
-        // Disable web view optimizations
+  
+               // Disable background optimizations for WebView
         BackgroundMode.disableWebViewOptimizations();
-
-        // Listen for background mode activation
-        document.addEventListener('activate', () => {
-          console.log('App is running in background mode.');
-          // Ensure location tracking continues in background mode
-          trackLocation();
-        });
-
-        // Listen for background mode deactivation
-        document.addEventListener('deactivate', () => {
-          console.log('App is running in foreground mode.');
-        });
+  
+       // Directly start location tracking after enabling background mode
+       trackLocation(); // Start tracking immediately
       }
     };
-
-    // Call the functions to fetch data and enable background mode
-    fetchRouteData();
-    enableBackgroundMode(); // Activate background mode tracking
-
-    // Cleanup event listeners when component unmounts
+  
+    enableBackgroundMode();
+  
     return () => {
-      document.removeEventListener('activate', () => {
-        console.log('Background mode listener removed.');
-      });
-
-      document.removeEventListener('deactivate', () => {
-        console.log('Foreground mode listener removed.');
-      });
+      BackgroundMode.disable();
     };
-  }, [user]);  // This ensures the effect re-runs when the `user` changes
+  }, [user]);
+  
 
 
   // Load route and contact data on view enter
@@ -289,47 +277,51 @@ const OnDemandTracking: React.FC = () => {
   };
 
   const trackLocation = async () => {
+    alert('Inside trackLocation');
     const routePath = getRoutePath();
     let intervalId: any;
     setDeviationAlertSent(false);
-
-    const estimatedTime = currentRoute.estimatedTime || 5;
+  
+    const estimatedTime = currentRoute?.estimatedTime || 5;
     const totalTime = parseInt(estimatedTime || '0', 10) + (timeDeviation || 5);
     const totalTimeoutInMs = totalTime * 60 * 1000;
-
+  
     const checkPosition = async () => {
-      const position = await getCurrentLocation();
+      const position = await getCurrentLocationWithRetries(); // Fetch current location
+      if (!position) return; // Skip if no location
       const { latitude, longitude } = position;
       const currentLocation = { latitude, longitude };
-
+  
       if (!latitude || !longitude || !routePath.length) return;
-      console.log('deviationAlertSent' + deviationAlertSent);
-
+  
       if (!deviationAlertSent && !isOnRoute(currentLocation, routePath)) {
         setDeviationAlertSent(true);
         await sendNotificationToContact('route-deviation', { location: currentLocation });
         stopTracking(intervalId, timeoutId);
       }
-
+  
       if (hasReachedDestination(currentLocation)) {
         await sendNotificationToContact('reached-destination', { location: currentLocation });
         stopTracking(intervalId, timeoutId);
       }
     };
-
+  
+    // Track location every 30 seconds
     intervalId = setInterval(checkPosition, 30000);
     setWatchId(intervalId);
-
+  
+    // Stop tracking after the total timeout
     const newTimeoutId = setTimeout(async () => {
-      const currentLocation = await getCurrentLocation();
+      const currentLocation = await getCurrentLocationWithRetries();
       if (!hasReachedDestination(currentLocation)) {
         await sendNotificationToContact('late-arrival', { location: currentLocation });
       }
       stopTracking(intervalId, newTimeoutId);
     }, totalTimeoutInMs);
-
+  
     setTimeoutId(newTimeoutId);
   };
+  
 
   const stopTracking = (intervalId: any, timeoutId: any) => {
     if (intervalId) {
@@ -385,41 +377,25 @@ const OnDemandTracking: React.FC = () => {
     return distanceToDestination <= 100; // 100 meters as the arrival threshold
   };
 
-  // Helper to get the current user's location
-  const getCurrentLocation = async () => {
-    console.log("getCurrentLocation");
-    try {
-      const position = await Geolocation.getCurrentPosition({
-        enableHighAccuracy: true,  // Request high accuracy for better GPS results
-        timeout: 10000,            // Set a timeout of 10 seconds (10000 ms)
-        maximumAge: 0              // Do not use a cached location
-      });
-
-      return {
-        latitude: position.coords.latitude,
-        longitude: position.coords.longitude,
-      };
-    } catch (error) {
-      alert('Error getting current location:' + error);
-      throw error;  // Re-throw the error to handle it in the calling function
-    }
-  };
-
   const getCurrentLocationWithRetries = async (retries = 3) => {
     while (retries > 0) {
       try {
-        return await getCurrentLocation();
+        const position = await Geolocation.getCurrentPosition({
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0,
+        });
+        return { latitude: position.coords.latitude, longitude: position.coords.longitude };
       } catch (error) {
-        if (error instanceof Error && 'code' in error && (error as any).code === 3 && retries > 0) {
+        if (retries > 1) {
           console.log('Retrying location fetch...');
-          retries -= 1;
-        } else {
-          throw error;
         }
+        retries--;
       }
     }
-    throw new Error('Unable to get location after multiple attempts');
+    throw new Error('Unable to fetch location after multiple retries');
   };
+  
 
 
 
