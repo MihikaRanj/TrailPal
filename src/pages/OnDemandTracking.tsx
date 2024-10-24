@@ -12,6 +12,7 @@ import './TrailPal.css';
 import { SMS } from '@awesome-cordova-plugins/sms';
 import { BackgroundMode } from '@awesome-cordova-plugins/background-mode';
 import { Geolocation } from '@capacitor/geolocation';
+import { AndroidPermissions } from '@awesome-cordova-plugins/android-permissions';
 
 
 const OnDemandTracking: React.FC = () => {
@@ -42,16 +43,61 @@ const OnDemandTracking: React.FC = () => {
   const [timeDeviation, setTimeDeviation] = useState<number>(0);
   const [distanceDeviation, setDistanceDeviation] = useState<number>(0);
   const [timeoutId, setTimeoutId] = useState<any | null>(null);
+  const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 
   const user = auth.currentUser;
 
+  const requestPermissions = async () => {
+    try {
+      // Check and request permissions for ACCESS_FINE_LOCATION, ACCESS_BACKGROUND_LOCATION, and SEND_SMS
+      const locationPermission = await AndroidPermissions.checkPermission(AndroidPermissions.PERMISSION.ACCESS_FINE_LOCATION);
+      const backgroundLocationPermission = await AndroidPermissions.checkPermission(AndroidPermissions.PERMISSION.ACCESS_BACKGROUND_LOCATION);
+      const smsPermission = await AndroidPermissions.checkPermission(AndroidPermissions.PERMISSION.SEND_SMS);
+  
+      // Request location permission if not granted
+      if (!locationPermission.hasPermission) {
+        await AndroidPermissions.requestPermission(AndroidPermissions.PERMISSION.ACCESS_FINE_LOCATION);
+      }
+  
+      // Request background location permission if not granted
+      if (!backgroundLocationPermission.hasPermission) {
+        await AndroidPermissions.requestPermission(AndroidPermissions.PERMISSION.ACCESS_BACKGROUND_LOCATION);
+      }
+  
+      // Request SMS permission if not granted
+      if (!smsPermission.hasPermission) {
+        await AndroidPermissions.requestPermission(AndroidPermissions.PERMISSION.SEND_SMS);
+      }
+  
+      // Check if permissions were granted
+      const locationGranted = await AndroidPermissions.checkPermission(AndroidPermissions.PERMISSION.ACCESS_FINE_LOCATION);
+      const backgroundLocationGranted = await AndroidPermissions.checkPermission(AndroidPermissions.PERMISSION.ACCESS_BACKGROUND_LOCATION);
+      const smsGranted = await AndroidPermissions.checkPermission(AndroidPermissions.PERMISSION.SEND_SMS);
+  
+      if (!locationGranted.hasPermission || !backgroundLocationGranted.hasPermission || !smsGranted.hasPermission) {
+        alert('Location or SMS permission not granted');
+      } else {
+        alert('All required permissions granted');
+      }
+    } catch (err) {
+      console.warn('Error requesting permissions', err);
+    }
+  };
+
   useEffect(() => {
+    // Request permissions when the component mounts
+    requestPermissions();
+  
+    // Fetch user data and route information
+    fetchUserData();
+    
     const fetchRouteData = async () => {
       if (user) {
         const routesCollection = collection(db, 'users', user.uid, 'currentdata');
         const routeDoc = doc(routesCollection, 'currentRoute');
         const contactDoc = doc(routesCollection, 'currentContact');
-
+  
         const routeSnapshot = await getDoc(routeDoc);
         if (routeSnapshot.exists()) {
           const routeData = routeSnapshot.data();
@@ -61,7 +107,7 @@ const OnDemandTracking: React.FC = () => {
           setMethodOfTravel(routeData.methodOfTravel || null);
           setEstimatedTime(routeData.estimatedTime || null);
         }
-
+  
         const contactSnapshot = await getDoc(contactDoc);
         if (contactSnapshot.exists()) {
           const contactData = contactSnapshot.data();
@@ -74,51 +120,53 @@ const OnDemandTracking: React.FC = () => {
       }
       setLoading(false);
     };
-
+  
     // Enable Background Mode
     const enableBackgroundMode = () => {
       if (window.cordova) {
         // Enable the background mode
         BackgroundMode.enable();
-
+  
         // Optional: Customize the notification when the app is in the background
         BackgroundMode.setDefaults({
           title: 'Tracking in progress',
-          text: 'Your location is being tracked.',
+          text: 'Your location is being tracked in the background.',
           color: 'F14F4D', // Notification icon color (Android)
         });
-
+  
         // Disable web view optimizations
         BackgroundMode.disableWebViewOptimizations();
-
+  
         // Listen for background mode activation
         document.addEventListener('activate', () => {
           console.log('App is running in background mode.');
+          // Ensure location tracking continues in background mode
+          trackLocation();
         });
-
+  
         // Listen for background mode deactivation
         document.addEventListener('deactivate', () => {
           console.log('App is running in foreground mode.');
         });
       }
     };
-
+  
+    // Call the functions to fetch data and enable background mode
     fetchRouteData();
     enableBackgroundMode(); // Activate background mode tracking
-
+  
     // Cleanup event listeners when component unmounts
     return () => {
       document.removeEventListener('activate', () => {
         console.log('Background mode listener removed.');
       });
-
+  
       document.removeEventListener('deactivate', () => {
         console.log('Foreground mode listener removed.');
       });
     };
-  }, [user]);
-
-
+  }, [user]);  // This ensures the effect re-runs when the `user` changes
+  
 
   // Load route and contact data on view enter
   useIonViewWillEnter(() => {
@@ -175,33 +223,10 @@ const OnDemandTracking: React.FC = () => {
   
 
 const startTracking = async () => {
-
   await fetchUserData(); // Ensure user data is fetched before continuing
   await loadData(); // Load route and contact data
 
-
-  const message = "Testing";
-
-  console.log(currentContact?.phone + ":"+ message);
-  alert(currentContact?.phone + ":"+ message)
-
-  try {
-    const options = {
-      replaceLineBreaks: false,
-      android: {
-        intent: '' // leave empty to send SMS without opening an SMS app
-      }
-    };
-
-    await SMS.send('2487874138', 'This is a test SMS from TrailPal app!', options);
-    await SMS.send(currentContact.phone, message);
-
-    alert('Test SMS sent successfully' +currentContact.phone);
-  } catch (error) {
-    console.error('Error sending SMS:', error);
-    alert('Failed to send SMS '+ error);
-  }
-
+  await delay(2000); // Delay for 2 seconds to ensure data has fully loaded
   console.log("startTracking");
   console.log(timeDeviation + ":" + distanceDeviation);
   console.log(currentRoute);
@@ -337,7 +362,7 @@ const stopTracking = (intervalId: any, timeoutId: any) => {
         longitude: position.coords.longitude,
       };
     } catch (error) {
-      console.error('Error getting current location:', error);
+      alert('Error getting current location:'+ error);
       throw error;  // Re-throw the error to handle it in the calling function
     }
   };
@@ -372,7 +397,7 @@ const sendNotificationToContact = async (type: string, data: any) => {
   const message = buildNotificationMessage(type, data);
 
   console.log(currentContact?.phone + ":"+ message);
-  alert(currentContact?.phone + ":"+ message)
+  //alert(currentContact?.phone + ":"+ message)
 
   try {
     const options = {
@@ -382,31 +407,45 @@ const sendNotificationToContact = async (type: string, data: any) => {
       }
     };
 
-    await SMS.send('2487874138', 'This is a test SMS from TrailPal app!', options);
-    await SMS.send(currentContact.phone, message);
+    //await SMS.send('2487874138', 'This is a test SMS from TrailPal app!', options);
+    await SMS.send(currentContact.phone, message, options);
 
-    alert('Test SMS sent successfully' +currentContact.phone);
+    console.log('Test SMS sent successfully' +currentContact.phone);
   } catch (error) {
     console.error('Error sending SMS:', error);
-    alert('Failed to send SMS '+ error);
+    console.log('Failed to send SMS '+ error);
   }
 };
 
 
-  const buildNotificationMessage = (type: string, data: any) => {
-    switch (type) {
-      case 'tracking-started':
-        return `${firstName == 'Not Specified'?(user?.email):firstName} has started their journey. Route details: ${JSON.stringify(data.route)}`;
-      case 'route-deviation':
-        return `${firstName == 'Not Specified'?(user?.email):firstName} has deviated from the planned route! Current location: ${JSON.stringify(data.location)}`;
-      case 'reached-destination':
-        return `${firstName == 'Not Specified'?(user?.email):firstName} has safely reached the destination.`;
-      case 'late-arrival':
-        return `${firstName == 'Not Specified'?(user?.email):firstName} has not arrived at the destination on time. Last known location: ${JSON.stringify(data.location)}`;
-      default:
-        return '';
-    }
+const buildNotificationMessage = (type: string, data: any) => {
+  const createLocationLink = (lat: number, lon: number) => {
+    return `https://www.google.com/maps?q=${lat},${lon}`;
   };
+
+  switch (type) {
+    case 'tracking-started':
+      const startLocationLink = createLocationLink(data.route.startlocation.lat, data.route.startlocation.lon);
+      const endLocationLink = createLocationLink(data.route.endlocation.lat, data.route.endlocation.lon);
+      return `${firstName == 'Not Specified' ? (user?.email) : firstName} has started their journey. \nStart: ${data.route.startlocation.address} \nEnd: ${data.route.endlocation.address} \nEstimated Travel Time: ${data.route.estimatedTime} minutes.\nStart Location: ${startLocationLink} \nEnd Location: ${endLocationLink}`;
+      
+    case 'route-deviation':
+      const currentLocationLink = createLocationLink(data.location.latitude, data.location.longitude);
+      return `${firstName == 'Not Specified' ? (user?.email) : firstName} has deviated from the planned route! Current location: ${currentLocationLink}`;
+      
+    case 'reached-destination':
+      const destinationLink = createLocationLink(data.location.latitude, data.location.longitude);
+      return `${firstName == 'Not Specified' ? (user?.email) : firstName} has safely reached the destination. \nLocation: ${destinationLink}`;
+      
+    case 'late-arrival':
+      const lastLocationLink = createLocationLink(data.location.latitude, data.location.longitude);
+      return `${firstName == 'Not Specified' ? (user?.email) : firstName} has not arrived at the destination on time. Last known location: ${lastLocationLink}`;
+      
+    default:
+      return '';
+  }
+};
+
 
   const clearRouteData = async () => {
     if (user) {
@@ -419,7 +458,6 @@ const sendNotificationToContact = async (type: string, data: any) => {
         await deleteDoc(contactDoc);
       } catch (error) {
         console.error('Error deleting route/contact data:', error);
-        alert('Failed to refresh. Please try again.');
       }
     }
 
@@ -460,7 +498,7 @@ const sendNotificationToContact = async (type: string, data: any) => {
         }
       } catch (error) {
         console.error('Error saving contact:', error);
-        alert('Failed to save the contact. Please try again.');
+        //alert('Failed to save the contact. Please try again.');
       }
     }
     setShowContactModal(false);
@@ -515,7 +553,7 @@ const sendNotificationToContact = async (type: string, data: any) => {
         }
       } catch (error) {
         console.error('Error saving contact:', error);
-        alert('Failed to save the contact. Please try again.');
+        //alert('Failed to save the contact. Please try again.');
       }
     } else {
       alert('Please enter both name and phone number');

@@ -34,7 +34,7 @@ const TrackRoutePage: React.FC = () => {
               <IonLabel>On-demand tracking</IonLabel>
             </IonTabButton>
 
-            <IonTabButton tab="scheduled" href="/track-route/scheduled" className="scheduled-tab">
+            <IonTabButton tab="scheduled" href="/track-route/scheduled">
               <IonLabel>Scheduled tracking</IonLabel>
               
             </IonTabButton>
