@@ -13,7 +13,7 @@ import { SMS } from '@awesome-cordova-plugins/sms';
 import { BackgroundMode } from '@awesome-cordova-plugins/background-mode';
 import { Geolocation } from '@capacitor/geolocation';
 import { AndroidPermissions } from '@awesome-cordova-plugins/android-permissions';
-
+import { Dialog } from '@capacitor/dialog';
 
 const OnDemandTracking: React.FC = () => {
   const history = useHistory();
@@ -48,49 +48,94 @@ const OnDemandTracking: React.FC = () => {
 
   const user = auth.currentUser;
 
-  const requestPermissions = async () => {
-  try {
-    // Check permissions for ACCESS_FINE_LOCATION, ACCESS_BACKGROUND_LOCATION, and SEND_SMS
-    const smsPermission = await AndroidPermissions.checkPermission(AndroidPermissions.PERMISSION.SEND_SMS);
 
-    // First, request foreground location permission
+
+
+
+  const requestLocationPermissions = async () => {
+
+    // Now ask for background permission
+    const backgroundPermission = await AndroidPermissions.requestPermission(AndroidPermissions.PERMISSION.ACCESS_BACKGROUND_LOCATION);
+
+    if (backgroundPermission.hasPermission) {
+      alert('Background location permission granted');
+    } else {
+      alert('Background location permission denied');
+    }
+
+  };
+
+  const explainBackgroundLocationAccess = async () => {
     const foregroundPermission = await AndroidPermissions.requestPermission(AndroidPermissions.PERMISSION.ACCESS_FINE_LOCATION);
-    
-    // If the foreground location permission is granted, request background location permission
+
     if (foregroundPermission.hasPermission) {
       alert('Foreground location permission granted');
-      const backgroundPermission = await AndroidPermissions.requestPermission(AndroidPermissions.PERMISSION.ACCESS_BACKGROUND_LOCATION);
 
-      if (backgroundPermission.hasPermission) {
-        alert('Background location permission granted');
-      } else {
-        alert('Background location permission denied:'+backgroundPermission);
+      const { value } = await Dialog.confirm({
+        title: 'Location Access Required',
+        message: 'We need background location access to track your location even when the app is not in use.',
+      });
+
+      if (value) {
+        // Proceed with requesting background location permission
+        await requestLocationPermissions();
       }
     } else {
       alert('Foreground location permission denied');
     }
-    // Add SMS permission if not granted
-    if (!smsPermission.hasPermission) {
-      const smsGranted = AndroidPermissions.requestPermission(AndroidPermissions.PERMISSION.SEND_SMS);
+  };
+
+  /* const requestPermissions = async () => {
+    try {
+  
+      const smsPermission = await AndroidPermissions.checkPermission(AndroidPermissions.PERMISSION.SEND_SMS);
+  
+      // Request foreground location permission first
+      const foregroundPermission = await AndroidPermissions.requestPermission(AndroidPermissions.PERMISSION.ACCESS_FINE_LOCATION);
+      
+      if (foregroundPermission.hasPermission) {
+        alert('Foreground location permission granted');
+  
+        // Check if we should show a rationale for background location permission
+        const shouldShowRationale = await AndroidPermissions.shouldShowRequestPermissionRationale(AndroidPermissions.PERMISSION.ACCESS_BACKGROUND_LOCATION);
+        
+        if (shouldShowRationale) {
+          alert('We need background location permission to track your location even when the app is not in use.');
+        }
+  
+        // Request background location permission
+        const backgroundPermission = await AndroidPermissions.requestPermission(AndroidPermissions.PERMISSION.ACCESS_BACKGROUND_LOCATION);
+  
+        if (backgroundPermission.hasPermission) {
+          alert('Background location permission granted');
+        } else {
+          alert('Background location permission denied');
+        }
+      } else {
+        alert('Foreground location permission denied');
+      }
+      if (!smsPermission.hasPermission) {
+        const smsGranted = AndroidPermissions.requestPermission(AndroidPermissions.PERMISSION.SEND_SMS);
+      }
+    } catch (error) {
+      console.warn('Error requesting permissions:', error);
     }
-  } catch (err) {
-    console.warn('Error requesting permissions', err);
-  }
-};
+  }; */
+
 
   useEffect(() => {
     // Request permissions when the component mounts
-    requestPermissions();
-  
+    explainBackgroundLocationAccess();
+
     // Fetch user data and route information
     fetchUserData();
-    
+
     const fetchRouteData = async () => {
       if (user) {
         const routesCollection = collection(db, 'users', user.uid, 'currentdata');
         const routeDoc = doc(routesCollection, 'currentRoute');
         const contactDoc = doc(routesCollection, 'currentContact');
-  
+
         const routeSnapshot = await getDoc(routeDoc);
         if (routeSnapshot.exists()) {
           const routeData = routeSnapshot.data();
@@ -100,7 +145,7 @@ const OnDemandTracking: React.FC = () => {
           setMethodOfTravel(routeData.methodOfTravel || null);
           setEstimatedTime(routeData.estimatedTime || null);
         }
-  
+
         const contactSnapshot = await getDoc(contactDoc);
         if (contactSnapshot.exists()) {
           const contactData = contactSnapshot.data();
@@ -113,53 +158,53 @@ const OnDemandTracking: React.FC = () => {
       }
       setLoading(false);
     };
-  
+
     // Enable Background Mode
     const enableBackgroundMode = () => {
       if (window.cordova) {
         // Enable the background mode
         BackgroundMode.enable();
-  
+
         // Optional: Customize the notification when the app is in the background
         BackgroundMode.setDefaults({
           title: 'Tracking in progress',
           text: 'Your location is being tracked in the background.',
           color: 'F14F4D', // Notification icon color (Android)
         });
-  
+
         // Disable web view optimizations
         BackgroundMode.disableWebViewOptimizations();
-  
+
         // Listen for background mode activation
         document.addEventListener('activate', () => {
           console.log('App is running in background mode.');
           // Ensure location tracking continues in background mode
           trackLocation();
         });
-  
+
         // Listen for background mode deactivation
         document.addEventListener('deactivate', () => {
           console.log('App is running in foreground mode.');
         });
       }
     };
-  
+
     // Call the functions to fetch data and enable background mode
     fetchRouteData();
     enableBackgroundMode(); // Activate background mode tracking
-  
+
     // Cleanup event listeners when component unmounts
     return () => {
       document.removeEventListener('activate', () => {
         console.log('Background mode listener removed.');
       });
-  
+
       document.removeEventListener('deactivate', () => {
         console.log('Foreground mode listener removed.');
       });
     };
   }, [user]);  // This ensures the effect re-runs when the `user` changes
-  
+
 
   // Load route and contact data on view enter
   useIonViewWillEnter(() => {
@@ -181,7 +226,7 @@ const OnDemandTracking: React.FC = () => {
       }
     }
   };
-  
+
 
   // Fetch route and contact details from Firestore
   const loadData = async (): Promise<void> => {
@@ -189,7 +234,7 @@ const OnDemandTracking: React.FC = () => {
       const routesCollection = collection(db, 'users', user.uid, 'currentdata');
       const routeDoc = doc(routesCollection, 'currentRoute');
       const contactDoc = doc(routesCollection, 'currentContact');
-  
+
       const routeSnapshot = await getDoc(routeDoc);
       if (routeSnapshot.exists()) {
         const routeData = routeSnapshot.data();
@@ -200,7 +245,7 @@ const OnDemandTracking: React.FC = () => {
         setEstimatedTime(routeData.estimatedTime || null);
         setCurrentRoute(routeData);
       }
-  
+
       const contactSnapshot = await getDoc(contactDoc);
       if (contactSnapshot.exists()) {
         const contactData = contactSnapshot.data();
@@ -213,96 +258,96 @@ const OnDemandTracking: React.FC = () => {
       }
     }
   };
-  
 
-const startTracking = async () => {
-  await fetchUserData(); // Ensure user data is fetched before continuing
-  await loadData(); // Load route and contact data
 
-  await delay(2000); // Delay for 2 seconds to ensure data has fully loaded
-  console.log("startTracking");
-  console.log(timeDeviation + ":" + distanceDeviation);
-  console.log(currentRoute);
-  console.log(currentContact);
+  const startTracking = async () => {
+    await fetchUserData(); // Ensure user data is fetched before continuing
+    await loadData(); // Load route and contact data
 
-  // Ensure that currentRoute and currentContact are fully loaded
-  if (!currentRoute || !currentContact) {
-    console.log('Route or contact data missing, tracking cannot start.');
-    return;
-  }
+    await delay(2000); // Delay for 2 seconds to ensure data has fully loaded
+    console.log("startTracking");
+    console.log(timeDeviation + ":" + distanceDeviation);
+    console.log(currentRoute);
+    console.log(currentContact);
 
-  setTracking(true);
-
-  // Send initial notification to contact
-  await sendNotificationToContact('tracking-started', {
-    location: await getCurrentLocationWithRetries(),
-    route: currentRoute,
-  });
-
-  // Start location tracking
-  trackLocation();
-};
-
-const trackLocation = async () => {
-  const routePath = getRoutePath(); 
-  let intervalId: any;
-  setDeviationAlertSent(false);  
-
-  const estimatedTime = currentRoute.estimatedTime || 5; 
-  const totalTime = parseInt(estimatedTime || '0', 10) + (timeDeviation || 5);
-  const totalTimeoutInMs = totalTime * 60 * 1000; 
-
-  const checkPosition = async () => {
-    const position = await getCurrentLocation(); 
-    const { latitude, longitude } = position;
-    const currentLocation = { latitude, longitude };
-
-    if (!latitude || !longitude || !routePath.length) return; 
-    console.log('deviationAlertSent' + deviationAlertSent);
-
-    if (!deviationAlertSent && !isOnRoute(currentLocation, routePath)) {
-      setDeviationAlertSent(true);
-      await sendNotificationToContact('route-deviation', { location: currentLocation });
-      stopTracking(intervalId, timeoutId); 
+    // Ensure that currentRoute and currentContact are fully loaded
+    if (!currentRoute || !currentContact) {
+      console.log('Route or contact data missing, tracking cannot start.');
+      return;
     }
 
-    if (hasReachedDestination(currentLocation)) {
-      await sendNotificationToContact('reached-destination', { location: currentLocation });
-      stopTracking(intervalId, timeoutId); 
-    }
+    setTracking(true);
+
+    // Send initial notification to contact
+    await sendNotificationToContact('tracking-started', {
+      location: await getCurrentLocationWithRetries(),
+      route: currentRoute,
+    });
+
+    // Start location tracking
+    trackLocation();
   };
 
-  intervalId = setInterval(checkPosition, 30000); 
-  setWatchId(intervalId); 
+  const trackLocation = async () => {
+    const routePath = getRoutePath();
+    let intervalId: any;
+    setDeviationAlertSent(false);
 
-  const newTimeoutId = setTimeout(async () => {
-    const currentLocation = await getCurrentLocation();
-    if (!hasReachedDestination(currentLocation)) {
-      await sendNotificationToContact('late-arrival', { location: currentLocation });
+    const estimatedTime = currentRoute.estimatedTime || 5;
+    const totalTime = parseInt(estimatedTime || '0', 10) + (timeDeviation || 5);
+    const totalTimeoutInMs = totalTime * 60 * 1000;
+
+    const checkPosition = async () => {
+      const position = await getCurrentLocation();
+      const { latitude, longitude } = position;
+      const currentLocation = { latitude, longitude };
+
+      if (!latitude || !longitude || !routePath.length) return;
+      console.log('deviationAlertSent' + deviationAlertSent);
+
+      if (!deviationAlertSent && !isOnRoute(currentLocation, routePath)) {
+        setDeviationAlertSent(true);
+        await sendNotificationToContact('route-deviation', { location: currentLocation });
+        stopTracking(intervalId, timeoutId);
+      }
+
+      if (hasReachedDestination(currentLocation)) {
+        await sendNotificationToContact('reached-destination', { location: currentLocation });
+        stopTracking(intervalId, timeoutId);
+      }
+    };
+
+    intervalId = setInterval(checkPosition, 30000);
+    setWatchId(intervalId);
+
+    const newTimeoutId = setTimeout(async () => {
+      const currentLocation = await getCurrentLocation();
+      if (!hasReachedDestination(currentLocation)) {
+        await sendNotificationToContact('late-arrival', { location: currentLocation });
+      }
+      stopTracking(intervalId, newTimeoutId);
+    }, totalTimeoutInMs);
+
+    setTimeoutId(newTimeoutId);
+  };
+
+  const stopTracking = (intervalId: any, timeoutId: any) => {
+    if (intervalId) {
+      clearInterval(intervalId);
+      setWatchId(null);
     }
-    stopTracking(intervalId, newTimeoutId); 
-  }, totalTimeoutInMs);
 
-  setTimeoutId(newTimeoutId);
-};
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+      setTimeoutId(null);
+    }
 
-const stopTracking = (intervalId: any, timeoutId: any) => {
-  if (intervalId) {
-    clearInterval(intervalId); 
-    setWatchId(null);
-  }
+    if (watchId) {
+      Geolocation.clearWatch({ id: watchId });
+    }
 
-  if (timeoutId) {
-    clearTimeout(timeoutId); 
-    setTimeoutId(null);
-  }
-
-  if (watchId) {
-    Geolocation.clearWatch({ id: watchId });
-  }
-
-  setTracking(false);
-};
+    setTracking(false);
+  };
 
 
 
@@ -319,11 +364,11 @@ const stopTracking = (intervalId: any, timeoutId: any) => {
   // Helper to check if the user is on the route within a 5 mile range
   const isOnRoute = (currentLocation: any, routePath: any[]) => {
     console.log("isOnRoute");
-    console.log("distanceDeviation"+distanceDeviation);
+    console.log("distanceDeviation" + distanceDeviation);
     //console.log(routePath);
     const closestPoint = findNearest(currentLocation, routePath);
     const distanceToRoute = getDistance(currentLocation, closestPoint);
-    return distanceToRoute <= distanceDeviation*1609.34; // convert miles in meters
+    return distanceToRoute <= distanceDeviation * 1609.34; // convert miles in meters
   };
 
   // Helper to check if the user has reached the destination
@@ -349,13 +394,13 @@ const stopTracking = (intervalId: any, timeoutId: any) => {
         timeout: 10000,            // Set a timeout of 10 seconds (10000 ms)
         maximumAge: 0              // Do not use a cached location
       });
-  
+
       return {
         latitude: position.coords.latitude,
         longitude: position.coords.longitude,
       };
     } catch (error) {
-      alert('Error getting current location:'+ error);
+      alert('Error getting current location:' + error);
       throw error;  // Re-throw the error to handle it in the calling function
     }
   };
@@ -375,69 +420,69 @@ const stopTracking = (intervalId: any, timeoutId: any) => {
     }
     throw new Error('Unable to get location after multiple attempts');
   };
-  
-  
-  
-// Update the sendNotificationToContact function to send SMS
-const sendNotificationToContact = async (type: string, data: any) => {
-  console.log(currentContact?.phone);
-  if (!currentContact?.phone) {
-    console.log('Phone number is missing. Cannot send SMS.');
-    return;
-  }
-
-  // Build the SMS message content
-  const message = buildNotificationMessage(type, data);
-
-  console.log(currentContact?.phone + ":"+ message);
-  //alert(currentContact?.phone + ":"+ message)
-
-  try {
-    const options = {
-      replaceLineBreaks: false,
-      android: {
-        intent: '' // leave empty to send SMS without opening an SMS app
-      }
-    };
-
-    //await SMS.send('2487874138', 'This is a test SMS from TrailPal app!', options);
-    await SMS.send(currentContact.phone, message, options);
-
-    console.log('Test SMS sent successfully' +currentContact.phone);
-  } catch (error) {
-    console.error('Error sending SMS:', error);
-    console.log('Failed to send SMS '+ error);
-  }
-};
 
 
-const buildNotificationMessage = (type: string, data: any) => {
-  const createLocationLink = (lat: number, lon: number) => {
-    return `https://www.google.com/maps?q=${lat},${lon}`;
+
+  // Update the sendNotificationToContact function to send SMS
+  const sendNotificationToContact = async (type: string, data: any) => {
+    console.log(currentContact?.phone);
+    if (!currentContact?.phone) {
+      console.log('Phone number is missing. Cannot send SMS.');
+      return;
+    }
+
+    // Build the SMS message content
+    const message = buildNotificationMessage(type, data);
+
+    console.log(currentContact?.phone + ":" + message);
+    //alert(currentContact?.phone + ":"+ message)
+
+    try {
+      const options = {
+        replaceLineBreaks: false,
+        android: {
+          intent: '' // leave empty to send SMS without opening an SMS app
+        }
+      };
+
+      //await SMS.send('2487874138', 'This is a test SMS from TrailPal app!', options);
+      await SMS.send(currentContact.phone, message, options);
+
+      console.log('Test SMS sent successfully' + currentContact.phone);
+    } catch (error) {
+      console.error('Error sending SMS:', error);
+      console.log('Failed to send SMS ' + error);
+    }
   };
 
-  switch (type) {
-    case 'tracking-started':
-      const startLocationLink = createLocationLink(data.route.startlocation.lat, data.route.startlocation.lon);
-      const endLocationLink = createLocationLink(data.route.endlocation.lat, data.route.endlocation.lon);
-      return `${firstName == 'Not Specified' ? (user?.email) : firstName} has started their journey. \nStart: ${data.route.startlocation.address} \nEnd: ${data.route.endlocation.address} \nEstimated Travel Time: ${data.route.estimatedTime} minutes.\nStart Location: ${startLocationLink} \nEnd Location: ${endLocationLink}`;
-      
-    case 'route-deviation':
-      const currentLocationLink = createLocationLink(data.location.latitude, data.location.longitude);
-      return `${firstName == 'Not Specified' ? (user?.email) : firstName} has deviated from the planned route! Current location: ${currentLocationLink}`;
-      
-    case 'reached-destination':
-      const destinationLink = createLocationLink(data.location.latitude, data.location.longitude);
-      return `${firstName == 'Not Specified' ? (user?.email) : firstName} has safely reached the destination. \nLocation: ${destinationLink}`;
-      
-    case 'late-arrival':
-      const lastLocationLink = createLocationLink(data.location.latitude, data.location.longitude);
-      return `${firstName == 'Not Specified' ? (user?.email) : firstName} has not arrived at the destination on time. Last known location: ${lastLocationLink}`;
-      
-    default:
-      return '';
-  }
-};
+
+  const buildNotificationMessage = (type: string, data: any) => {
+    const createLocationLink = (lat: number, lon: number) => {
+      return `https://www.google.com/maps?q=${lat},${lon}`;
+    };
+
+    switch (type) {
+      case 'tracking-started':
+        const startLocationLink = createLocationLink(data.route.startlocation.lat, data.route.startlocation.lon);
+        const endLocationLink = createLocationLink(data.route.endlocation.lat, data.route.endlocation.lon);
+        return `${firstName == 'Not Specified' ? (user?.email) : firstName} has started their journey. \nStart: ${data.route.startlocation.address} \nEnd: ${data.route.endlocation.address} \nEstimated Travel Time: ${data.route.estimatedTime} minutes.\nStart Location: ${startLocationLink} \nEnd Location: ${endLocationLink}`;
+
+      case 'route-deviation':
+        const currentLocationLink = createLocationLink(data.location.latitude, data.location.longitude);
+        return `${firstName == 'Not Specified' ? (user?.email) : firstName} has deviated from the planned route! Current location: ${currentLocationLink}`;
+
+      case 'reached-destination':
+        const destinationLink = createLocationLink(data.location.latitude, data.location.longitude);
+        return `${firstName == 'Not Specified' ? (user?.email) : firstName} has safely reached the destination. \nLocation: ${destinationLink}`;
+
+      case 'late-arrival':
+        const lastLocationLink = createLocationLink(data.location.latitude, data.location.longitude);
+        return `${firstName == 'Not Specified' ? (user?.email) : firstName} has not arrived at the destination on time. Last known location: ${lastLocationLink}`;
+
+      default:
+        return '';
+    }
+  };
 
 
   const clearRouteData = async () => {
@@ -484,9 +529,9 @@ const buildNotificationMessage = (type: string, data: any) => {
       try {
         if (user) {
           const routesCollection = collection(db, 'users', user.uid, 'currentdata');
-          const contactDoc = doc(routesCollection, 'currentContact');      
+          const contactDoc = doc(routesCollection, 'currentContact');
           await setDoc(contactDoc, newContact, { merge: true }); // Update Firestore with new field value   
-        
+
           setContact(newContact);
         }
       } catch (error) {
@@ -536,9 +581,9 @@ const buildNotificationMessage = (type: string, data: any) => {
             //alert('Contact saved successfully to saved contacts!');
           }
 
-         
+
           const routesCollection = collection(db, 'users', user.uid, 'currentdata');
-          const currentContactDoc = doc(routesCollection, 'currentContact');            
+          const currentContactDoc = doc(routesCollection, 'currentContact');
           await setDoc(currentContactDoc, newContact, { merge: true }); // Update Firestore with new field value
 
           setContact(newContact);
@@ -575,10 +620,10 @@ const buildNotificationMessage = (type: string, data: any) => {
   const handleSelectContact = async () => {
     if (selectedContact) {
       try {
-        if (user){
+        if (user) {
           const routesCollection = collection(db, 'users', user.uid, 'currentdata');
-          const contactDoc = doc(routesCollection, 'currentContact');      
-      
+          const contactDoc = doc(routesCollection, 'currentContact');
+
           await setDoc(contactDoc, selectedContact, { merge: true }); // Update Firestore with new field value
           setContact(selectedContact);
           setShowSelectContactModal(false);
@@ -628,9 +673,9 @@ const buildNotificationMessage = (type: string, data: any) => {
   const handleSelectRoute = async () => {
     if (selectedSavedRoute) {
       try {
-        if (user){
+        if (user) {
           const routesCollection = collection(db, 'users', user.uid, 'currentdata');
-          const currentRouteDoc = doc(routesCollection, 'currentRoute');            
+          const currentRouteDoc = doc(routesCollection, 'currentRoute');
           await setDoc(currentRouteDoc, selectedSavedRoute, { merge: true }); // Update Firestore with new field value
           setStartLocation(selectedSavedRoute.startlocation?.address || null);
           setEndLocation(selectedSavedRoute.endlocation?.address || null);
@@ -755,9 +800,9 @@ const buildNotificationMessage = (type: string, data: any) => {
 
         {contact && contact.email !== 'Not specified' && (
           <IonItem>
-                <IonLabel>Email: {contact?.email}</IonLabel>
-                </IonItem>
-              )}
+            <IonLabel>Email: {contact?.email}</IonLabel>
+          </IonItem>
+        )}
 
 
         <IonModal isOpen={showContactModal} onDidDismiss={() => setShowContactModal(false)}>
@@ -821,7 +866,7 @@ const buildNotificationMessage = (type: string, data: any) => {
 
         <IonModal isOpen={showSelectRouteModal} onDidPresent={fetchSavedRoutes}>
           <IonHeader>
-          <IonToolbar>
+            <IonToolbar>
               <IonButtons slot="start">
                 <IonButton onClick={handleSelectRouteBack}>
                   <IonIcon icon={arrowBack} />
@@ -839,7 +884,7 @@ const buildNotificationMessage = (type: string, data: any) => {
           <IonContent>
             {savedRoutes.map(route => (
               <IonItem key={route.id} onClick={() => setSelectedSavedRoute(route)}
-              color={selectedSavedRoute?.id === route.id ? 'medium' : 'light'}>
+                color={selectedSavedRoute?.id === route.id ? 'medium' : 'light'}>
                 <IonLabel>From: [{route.startlocation.address}], To: [{route.endlocation.address}], Estimated Time: [{route.estimatedTime}]</IonLabel>
               </IonItem>
             ))}
@@ -854,22 +899,22 @@ const buildNotificationMessage = (type: string, data: any) => {
           </IonFooter>
         </IonModal>
 
-        
+
 
       </IonContent>
       <IonButton onClick={startTracking} disabled={tracking}>
-          Start Tracking
-        </IonButton>
-        <IonButton onClick={() => stopTracking(watchId, timeoutId)} disabled={!tracking}>
-          Stop Tracking
-        </IonButton>
-        
-        {/* Optionally show a toast when tracking starts */}
-        <IonToast
-          isOpen={tracking}
-          message="Tracking started."
-          duration={2000}
-        />
+        Start Tracking
+      </IonButton>
+      <IonButton onClick={() => stopTracking(watchId, timeoutId)} disabled={!tracking}>
+        Stop Tracking
+      </IonButton>
+
+      {/* Optionally show a toast when tracking starts */}
+      <IonToast
+        isOpen={tracking}
+        message="Tracking started."
+        duration={2000}
+      />
       <BottomBar />
     </IonPage>
   );
