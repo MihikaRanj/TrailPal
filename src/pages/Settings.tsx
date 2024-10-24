@@ -63,12 +63,12 @@ const Settings: React.FC = () => {
   return (
     <IonPage>
       <IonHeader>
-        <IonToolbar>
+        <IonToolbar color="light">
           <IonTitle className="ion-text-center">Settings Page</IonTitle>
         </IonToolbar>
       </IonHeader>
       
-      <IonContent className="ion-padding">
+      <IonContent color="success" className="ion-padding">
         {/* First Name Input */}
         <IonItem>
           <IonLabel>First Name</IonLabel>

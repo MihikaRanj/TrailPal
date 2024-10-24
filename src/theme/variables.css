@@ -1,2 +1,44 @@
 /* For information on how to create your own theme, please see:
 http://ionicframework.com/docs/theming/ */
+
+:root {
+    --ion-color-primary: #aebb82;
+    --ion-color-primary-rgb: 105, 187, 123;
+    --ion-color-primary-contrast: #2f2f2f;
+    --ion-color-primary-contrast-rgb: 255, 255, 255;
+    --ion-color-primary-shade: #aebb82;
+    --ion-color-primary-tint: #aebb82;
+  }
+
+  :root {
+    --ion-color-danger: #ecf3c4;
+    --ion-color-danger-rgb: 105, 187, 123;
+    --ion-color-danger-contrast: #080000;
+    --ion-color-danger-contrast-rgb: 255, 255, 255;
+    --ion-color-danger-shade: #ecf3c4;
+    --ion-color-danger-tint: #ecf3c4;
+  }
+
+  :root {
+    --ion-color-success: #e9eeea;
+    --ion-color-success-rgb: 105, 187, 123;
+    --ion-color-success-contrast: #080000;
+    --ion-color-success-contrast-rgb: 255, 255, 255;
+    --ion-color-success-shade: #e9eeea;
+    --ion-color-success-tint: #e9eeea;
+  }
+  :root {
+    --ion-color-light: #e2e4dc;
+    --ion-color-light-rgb: 105, 187, 123;
+    --ion-color-light-contrast: #080000;
+    --ion-color-light-contrast-rgb: 255, 255, 255;
+    --ion-color-light-shade: #e2e4dc;
+    --ion-color-light-tint: #e2e4dc;
+  }
+  /*ion-tabs {
+    --ion-tabbar-background-color: #9797d6;
+    // TODO: remove hack:
+    --ion-tabbar-text-color: rgba(var(--ion-text-color-rgb), 0.4) !important;
+    --ion-color-primary: var(--ion-text-color) !important;
+}
+    */

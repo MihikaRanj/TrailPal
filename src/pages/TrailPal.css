@@ -1,11 +1,11 @@
 .on-demand-tab {
-    background-color: #d3e6f6;
+    background-color: #aebb82;
     color: #000;
   }
   
   .scheduled-tab {
-    background-color: #a6c5da;
-    color: #fff;
+    background-color: #ecf3c4;
+    color: #000000;
   }
   
   .geo-fence-tab {
@@ -16,5 +16,6 @@
   .selected-contact {
     background-color: #d61818; /* Change to the color you want */
   }
+  
   
   
