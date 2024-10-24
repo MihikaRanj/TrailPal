@@ -49,51 +49,51 @@ const OnDemandTracking: React.FC = () => {
   const user = auth.currentUser;
 
   const requestPermissions = async () => {
-    try {
-      // Check permissions for ACCESS_FINE_LOCATION, ACCESS_BACKGROUND_LOCATION, and SEND_SMS
-      const locationPermission = await AndroidPermissions.checkPermission(AndroidPermissions.PERMISSION.ACCESS_FINE_LOCATION);
-      const backgroundLocationPermission = await AndroidPermissions.checkPermission(AndroidPermissions.PERMISSION.ACCESS_BACKGROUND_LOCATION);
-      const smsPermission = await AndroidPermissions.checkPermission(AndroidPermissions.PERMISSION.SEND_SMS);
-  
-      // Create a list of permissions to request
-      const permissionsToRequest = [];
-  
-      // Add location permissions if not granted
-      if (!locationPermission.hasPermission) {
-        permissionsToRequest.push(AndroidPermissions.PERMISSION.ACCESS_FINE_LOCATION);
-      }
-  
-      if (!backgroundLocationPermission.hasPermission) {
-        permissionsToRequest.push(AndroidPermissions.PERMISSION.ACCESS_BACKGROUND_LOCATION);
-      }
-  
-      // Add SMS permission if not granted
-      if (!smsPermission.hasPermission) {
-        permissionsToRequest.push(AndroidPermissions.PERMISSION.SEND_SMS);
-      }
-  
-      // Request permissions if any are needed
-      if (permissionsToRequest.length > 0) {
-        const result = await AndroidPermissions.requestPermissions(permissionsToRequest);
-  
-        // Check if all permissions were granted
-        const locationGranted = result.hasPermission || await AndroidPermissions.checkPermission(AndroidPermissions.PERMISSION.ACCESS_FINE_LOCATION);
-        const backgroundLocationGranted = result.hasPermission || await AndroidPermissions.checkPermission(AndroidPermissions.PERMISSION.ACCESS_BACKGROUND_LOCATION);
-        const smsGranted = result.hasPermission || await AndroidPermissions.checkPermission(AndroidPermissions.PERMISSION.SEND_SMS);
-  
-        if (!locationGranted.hasPermission || !backgroundLocationGranted.hasPermission || !smsGranted.hasPermission) {
-          alert('Location or SMS permission not granted');
-        } else {
-          alert('All required permissions granted');
-        }
-      } else {
-        alert('All permissions are already granted');
-      }
-    } catch (err) {
-      console.warn('Error requesting permissions', err);
+  try {
+    // Check permissions for ACCESS_FINE_LOCATION, ACCESS_BACKGROUND_LOCATION, and SEND_SMS
+    const locationPermission = await AndroidPermissions.checkPermission(AndroidPermissions.PERMISSION.ACCESS_FINE_LOCATION);
+    const backgroundLocationPermission = await AndroidPermissions.checkPermission(AndroidPermissions.PERMISSION.ACCESS_BACKGROUND_LOCATION);
+    const smsPermission = await AndroidPermissions.checkPermission(AndroidPermissions.PERMISSION.SEND_SMS);
+
+    // Create a list of permissions to request
+    const permissionsToRequest = [];
+
+    // Add location permissions if not granted
+    if (!locationPermission.hasPermission) {
+      permissionsToRequest.push(AndroidPermissions.PERMISSION.ACCESS_FINE_LOCATION);
     }
-  };
-  
+
+    if (!backgroundLocationPermission.hasPermission) {
+      permissionsToRequest.push(AndroidPermissions.PERMISSION.ACCESS_BACKGROUND_LOCATION);
+    }
+
+    // Add SMS permission if not granted
+    if (!smsPermission.hasPermission) {
+      permissionsToRequest.push(AndroidPermissions.PERMISSION.SEND_SMS);
+    }
+
+    // Request permissions if any are needed
+    if (permissionsToRequest.length > 0) {
+      const result = await AndroidPermissions.requestPermissions(permissionsToRequest);
+
+      // Check if all permissions were granted
+      const locationGranted = result.hasPermission || await AndroidPermissions.checkPermission(AndroidPermissions.PERMISSION.ACCESS_FINE_LOCATION);
+      const backgroundLocationGranted = result.hasPermission || await AndroidPermissions.checkPermission(AndroidPermissions.PERMISSION.ACCESS_BACKGROUND_LOCATION);
+      const smsGranted = result.hasPermission || await AndroidPermissions.checkPermission(AndroidPermissions.PERMISSION.SEND_SMS);
+
+      if (!locationGranted.hasPermission || !backgroundLocationGranted.hasPermission || !smsGranted.hasPermission) {
+        alert('Location or SMS permission not granted');
+      } else {
+        alert('All required permissions granted');
+      }
+    } else {
+      alert('All permissions are already granted');
+    }
+  } catch (err) {
+    console.warn('Error requesting permissions', err);
+  }
+};
+
   useEffect(() => {
     // Request permissions when the component mounts
     requestPermissions();
