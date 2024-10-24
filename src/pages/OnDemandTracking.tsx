@@ -43,6 +43,8 @@ const OnDemandTracking: React.FC = () => {
   const [timeDeviation, setTimeDeviation] = useState<number>(0);
   const [distanceDeviation, setDistanceDeviation] = useState<number>(0);
   const [timeoutId, setTimeoutId] = useState<any | null>(null);
+  const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 
   const user = auth.currentUser;
 
@@ -78,6 +80,7 @@ const OnDemandTracking: React.FC = () => {
   
   useEffect(() => {
     requestPermissions();
+    fetchUserData(); // Ensure user data is fetched before continuing
     const fetchRouteData = async () => {
       if (user) {
         const routesCollection = collection(db, 'users', user.uid, 'currentdata');
@@ -207,33 +210,10 @@ const OnDemandTracking: React.FC = () => {
   
 
 const startTracking = async () => {
-
   await fetchUserData(); // Ensure user data is fetched before continuing
   await loadData(); // Load route and contact data
 
-
-  const message = "Testing";
-
-  console.log(currentContact?.phone + ":"+ message);
-  alert(currentContact?.phone + ":"+ message)
-
-  try {
-    const options = {
-      replaceLineBreaks: false,
-      android: {
-        intent: '' // leave empty to send SMS without opening an SMS app
-      }
-    };
-
-    await SMS.send('2487874138', 'This is a test SMS from TrailPal app!', options);
-    await SMS.send(currentContact.phone, message);
-
-    alert('Test SMS sent successfully' +currentContact.phone);
-  } catch (error) {
-    console.error('Error sending SMS:', error);
-    alert('Failed to send SMS '+ error);
-  }
-
+  await delay(2000); // Delay for 2 seconds to ensure data has fully loaded
   console.log("startTracking");
   console.log(timeDeviation + ":" + distanceDeviation);
   console.log(currentRoute);
@@ -356,7 +336,7 @@ const stopTracking = (intervalId: any, timeoutId: any) => {
 
   // Helper to get the current user's location
   const getCurrentLocation = async () => {
-    alert("getCurrentLocation");
+    console.log("getCurrentLocation");
     try {
       const position = await Geolocation.getCurrentPosition({
         enableHighAccuracy: true,  // Request high accuracy for better GPS results
@@ -404,7 +384,7 @@ const sendNotificationToContact = async (type: string, data: any) => {
   const message = buildNotificationMessage(type, data);
 
   console.log(currentContact?.phone + ":"+ message);
-  alert(currentContact?.phone + ":"+ message)
+  //alert(currentContact?.phone + ":"+ message)
 
   try {
     const options = {
@@ -414,31 +394,45 @@ const sendNotificationToContact = async (type: string, data: any) => {
       }
     };
 
-    await SMS.send('2487874138', 'This is a test SMS from TrailPal app!', options);
-    await SMS.send(currentContact.phone, message);
+    //await SMS.send('2487874138', 'This is a test SMS from TrailPal app!', options);
+    await SMS.send(currentContact.phone, message, options);
 
-    alert('Test SMS sent successfully' +currentContact.phone);
+    console.log('Test SMS sent successfully' +currentContact.phone);
   } catch (error) {
     console.error('Error sending SMS:', error);
-    alert('Failed to send SMS '+ error);
+    console.log('Failed to send SMS '+ error);
   }
 };
 
 
-  const buildNotificationMessage = (type: string, data: any) => {
-    switch (type) {
-      case 'tracking-started':
-        return `${firstName == 'Not Specified'?(user?.email):firstName} has started their journey. Route details: ${JSON.stringify(data.route)}`;
-      case 'route-deviation':
-        return `${firstName == 'Not Specified'?(user?.email):firstName} has deviated from the planned route! Current location: ${JSON.stringify(data.location)}`;
-      case 'reached-destination':
-        return `${firstName == 'Not Specified'?(user?.email):firstName} has safely reached the destination.`;
-      case 'late-arrival':
-        return `${firstName == 'Not Specified'?(user?.email):firstName} has not arrived at the destination on time. Last known location: ${JSON.stringify(data.location)}`;
-      default:
-        return '';
-    }
+const buildNotificationMessage = (type: string, data: any) => {
+  const createLocationLink = (lat: number, lon: number) => {
+    return `https://www.google.com/maps?q=${lat},${lon}`;
   };
+
+  switch (type) {
+    case 'tracking-started':
+      const startLocationLink = createLocationLink(data.route.startlocation.lat, data.route.startlocation.lon);
+      const endLocationLink = createLocationLink(data.route.endlocation.lat, data.route.endlocation.lon);
+      return `${firstName == 'Not Specified' ? (user?.email) : firstName} has started their journey. \nStart: ${data.route.startlocation.address} \nEnd: ${data.route.endlocation.address} \nEstimated Travel Time: ${data.route.estimatedTime} minutes.\nStart Location: ${startLocationLink} \nEnd Location: ${endLocationLink}`;
+      
+    case 'route-deviation':
+      const currentLocationLink = createLocationLink(data.location.latitude, data.location.longitude);
+      return `${firstName == 'Not Specified' ? (user?.email) : firstName} has deviated from the planned route! Current location: ${currentLocationLink}`;
+      
+    case 'reached-destination':
+      const destinationLink = createLocationLink(data.location.latitude, data.location.longitude);
+      return `${firstName == 'Not Specified' ? (user?.email) : firstName} has safely reached the destination. \nLocation: ${destinationLink}`;
+      
+    case 'late-arrival':
+      const lastLocationLink = createLocationLink(data.location.latitude, data.location.longitude);
+      return `${firstName == 'Not Specified' ? (user?.email) : firstName} has not arrived at the destination on time. Last known location: ${lastLocationLink}`;
+      
+    default:
+      return '';
+  }
+};
+
 
   const clearRouteData = async () => {
     if (user) {
@@ -451,7 +445,6 @@ const sendNotificationToContact = async (type: string, data: any) => {
         await deleteDoc(contactDoc);
       } catch (error) {
         console.error('Error deleting route/contact data:', error);
-        alert('Failed to refresh. Please try again.');
       }
     }
 
@@ -492,7 +485,7 @@ const sendNotificationToContact = async (type: string, data: any) => {
         }
       } catch (error) {
         console.error('Error saving contact:', error);
-        alert('Failed to save the contact. Please try again.');
+        //alert('Failed to save the contact. Please try again.');
       }
     }
     setShowContactModal(false);
@@ -547,7 +540,7 @@ const sendNotificationToContact = async (type: string, data: any) => {
         }
       } catch (error) {
         console.error('Error saving contact:', error);
-        alert('Failed to save the contact. Please try again.');
+        //alert('Failed to save the contact. Please try again.');
       }
     } else {
       alert('Please enter both name and phone number');
