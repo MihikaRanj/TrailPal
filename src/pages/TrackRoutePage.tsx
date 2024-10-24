@@ -10,8 +10,10 @@ import {
   IonTabButton,
   IonLabel,
   IonRouterOutlet,
+  IonButton,
+  IonButtons,
 } from '@ionic/react';
-import { Route, Redirect } from 'react-router-dom';
+import { Route, Redirect, useHistory } from 'react-router-dom';
 
 // Import your sub-pages (On-demand, Scheduled, Geo-fence)
 import OnDemandTracking from './OnDemandTracking';
@@ -22,37 +24,31 @@ import './TrailPal.css';
 
 
 
+
 const TrackRoutePage: React.FC = () => {
+  const history = useHistory();
+
+const handleOnDemand = () => {
+  history.push('/track-route/on-demand');
+};
+
+const handleScheduled = () => {
+  // Navigate to View or Update Scheduled Route page (create the path for this page)
+  history.push('/track-route/scheduled');
+};
+
   return (
     <IonPage>
       <IonHeader>
         <IonToolbar color="light">
-          <IonTabs>
-          {/* Tab buttons at the top */}
-          <IonTabBar slot="top">
-            <IonTabButton tab="on-demand" href="/track-route/on-demand" className="on-demand-tab" >
+          <IonButtons slot="start">
+          <IonButton  onClick={handleOnDemand}  className="on-demand-tab" >
               <IonLabel>On-demand tracking</IonLabel>
-            </IonTabButton>
-
-            <IonTabButton tab="scheduled" href="/track-route/scheduled">
+            </IonButton>
+            <IonButton   onClick={handleScheduled} >
               <IonLabel>Scheduled tracking</IonLabel>
-              
-            </IonTabButton>
-
-            {/* <IonTabButton tab="geo-fence" href="/track-route/geo-fence" className="geo-fence-tab">
-              <IonLabel>Geo-fence location</IonLabel>
-            </IonTabButton> */}
-          </IonTabBar>
-            {/* Router outlet to render different components based on selected tab */}
-            <IonRouterOutlet>
-            {/* Route for each tab */}
-            <Route path="/track-route/on-demand" component={OnDemandTracking} exact />
-            <Route path="/track-route/scheduled" component={ScheduledTracking} exact />
-           {/*  <Route path="/track-route/geo-fence" component={GeoFenceLocation} exact /> */}
-
-           
-          </IonRouterOutlet>
-          </IonTabs>
+            </IonButton>
+          </IonButtons>
         </IonToolbar>
       </IonHeader>
 

@@ -47,6 +47,7 @@ import OnDemandTracking from './pages/OnDemandTracking';
 import ScheduledTracking from './pages/ScheduledTracking';
 import CreateScheduledRoute from './pages/CreateScheduledRoute';
 import ViewUpdateScheduledRoute from './pages/ViewUpdateScheduledRoute';
+//import { startBackgroundTask } from './services/backgroundTask';
 
 setupIonicReact();
 
@@ -55,6 +56,8 @@ const App: React.FC = () => {
   const [authenticated, setAuthenticated] = useState<boolean>(false);
 
   useEffect(() => {
+    console.log('Before startBackgroundFetch');
+   // startBackgroundTask(); 
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setAuthenticated(!!user);
     });
