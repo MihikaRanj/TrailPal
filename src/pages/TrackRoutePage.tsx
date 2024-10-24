@@ -57,7 +57,7 @@ const handleScheduled = () => {
 
         
           <IonLabel>Welcome to the <b>Track Route</b> page! This is the main page to start your tracking. Here you have two options, <b>on-demand tracking</b> which allows you to instantly start tracking a path, and <b>scheduled tracking</b> which allows you to schedule tracking a path to repeat every day at a given time. <br/> <br/>  In both options you will be able to create a new route in which you will fill in information pertaining to the route you choose to make such as start location, end location, any intermediate stops, and the estimated time you think it will take for the journey. You will get the opportunity to use a saved path, which is when you can reuse a path that you had previously saved. You also will have to create or select a contact for every path you want to be tracked. <br/> <br/>  Once done, your contact will start receiving SMS notifications when you start on the path, when you deviate from the path, when you reach the destination, or when you don’t reach the destination in the estimated time. 
-          The SMS will also contact your current location information.
+          The SMS will also contain your current location information.
           </IonLabel>
        
 

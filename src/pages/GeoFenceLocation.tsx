@@ -17,7 +17,7 @@ const GeoFenceLocation: React.FC = () => {
               <IonLabel>Back</IonLabel>
             </IonButton>
           </IonButtons>
-          <IonTitle>Geo-fence Location</IonTitle>
+          <IonTitle className="custom-ion-title">Geo-fence Location</IonTitle>
         </IonToolbar>
       </IonHeader>
       <IonContent>

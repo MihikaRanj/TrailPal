@@ -144,7 +144,7 @@ const CreateScheduledRoute: React.FC = () => {
         scheduledStartTime: scheduledStartTime,
         enableTracking: enableTracking,
       });
-      alert('Scheduled tracking has been enabled!');
+      //alert('Scheduled tracking has been enabled!');
     } catch (error) {
       console.error('Error saving scheduled tracking:', error);
       alert('Failed to enable scheduled tracking.');
@@ -255,6 +255,7 @@ const CreateScheduledRoute: React.FC = () => {
     } else if (value === 'select') {
       setShowSelectContactModal(true);
     }
+    loadData();
   };
 
   const handleSelectContact = async () => {
@@ -272,6 +273,7 @@ const CreateScheduledRoute: React.FC = () => {
         console.error('Error selecting contact:', error);
         alert('Failed to select the contact. Please try again.');
       }
+      loadData();
     }
   };
 
@@ -339,9 +341,11 @@ const CreateScheduledRoute: React.FC = () => {
         alert('Failed to select the route. Please try again.');
       }
     }
+    loadData();
   };
 
   const handleSelectRouteBack = async () => {
+    loadData();
     setShowSelectRouteModal(false);
     setSelectedSavedRoute(null);
   };
