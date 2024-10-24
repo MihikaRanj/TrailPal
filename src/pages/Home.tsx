@@ -77,7 +77,10 @@ const Home: React.FC = () => {
       <IonText>
           Hello! Welcome to <b>TrailPal</b>, an app that will be your Pal when you are travelling alone by monitoring your path.
           <br />
+          On the bottom of the screen you will see following icons.
           <br />
+          <br />
+
           <b>Track Route</b>- After pressing this icon you will be taken to a page in which you can start making your paths that
           you want to be tracked.
           You can also save paths and contacts, start your tracking right away or schedule them for future use!<br /><br />
