@@ -12,6 +12,7 @@ import './TrailPal.css';
 import { SMS } from '@awesome-cordova-plugins/sms';
 import { BackgroundMode } from '@awesome-cordova-plugins/background-mode';
 import { Geolocation } from '@capacitor/geolocation';
+import { AndroidPermissions } from '@awesome-cordova-plugins/android-permissions';
 
 
 const OnDemandTracking: React.FC = () => {
@@ -45,7 +46,38 @@ const OnDemandTracking: React.FC = () => {
 
   const user = auth.currentUser;
 
+  const requestPermissions = async () => {
+    try {
+      // Check and request permissions for both ACCESS_FINE_LOCATION and SEND_SMS
+      const locationPermission = await AndroidPermissions.checkPermission(AndroidPermissions.PERMISSION.ACCESS_FINE_LOCATION);
+      const smsPermission = await AndroidPermissions.checkPermission(AndroidPermissions.PERMISSION.SEND_SMS);
+  
+      // Request location permission if not granted
+      if (!locationPermission.hasPermission) {
+        await AndroidPermissions.requestPermission(AndroidPermissions.PERMISSION.ACCESS_FINE_LOCATION);
+      }
+  
+      // Request SMS permission if not granted
+      if (!smsPermission.hasPermission) {
+        await AndroidPermissions.requestPermission(AndroidPermissions.PERMISSION.SEND_SMS);
+      }
+  
+      // Check if permissions were granted
+      const locationGranted = await AndroidPermissions.checkPermission(AndroidPermissions.PERMISSION.ACCESS_FINE_LOCATION);
+      const smsGranted = await AndroidPermissions.checkPermission(AndroidPermissions.PERMISSION.SEND_SMS);
+  
+      if (!locationGranted.hasPermission || !smsGranted.hasPermission) {
+        alert('Location or SMS permission not granted');
+      } else {
+        alert('All required permissions granted');
+      }
+    } catch (err) {
+      console.warn('Error requesting permissions', err);
+    }
+  };
+  
   useEffect(() => {
+    requestPermissions();
     const fetchRouteData = async () => {
       if (user) {
         const routesCollection = collection(db, 'users', user.uid, 'currentdata');
@@ -324,7 +356,7 @@ const stopTracking = (intervalId: any, timeoutId: any) => {
 
   // Helper to get the current user's location
   const getCurrentLocation = async () => {
-    console.log("getCurrentLocation");
+    alert("getCurrentLocation");
     try {
       const position = await Geolocation.getCurrentPosition({
         enableHighAccuracy: true,  // Request high accuracy for better GPS results
@@ -337,7 +369,7 @@ const stopTracking = (intervalId: any, timeoutId: any) => {
         longitude: position.coords.longitude,
       };
     } catch (error) {
-      console.error('Error getting current location:', error);
+      alert('Error getting current location:'+ error);
       throw error;  // Re-throw the error to handle it in the calling function
     }
   };
