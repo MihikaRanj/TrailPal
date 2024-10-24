@@ -20,7 +20,7 @@ const ScheduledTracking: React.FC = () => {
   return (
     <IonPage>
       <IonHeader>
-        <IonToolbar>
+        <IonToolbar color="light">
           <IonButtons slot="start">
             <IonButton onClick={() => history.push('/track-route')}>
               <IonIcon icon={arrowBack} />
@@ -38,7 +38,7 @@ const ScheduledTracking: React.FC = () => {
         </IonButton>
 
         {/* Button to view or update scheduled route */}
-        <IonButton expand="block" color="secondary" onClick={handleViewUpdateScheduledRoute}>
+        <IonButton color="danger" expand="block" onClick={handleViewUpdateScheduledRoute}>
           View / Update Scheduled Route
         </IonButton>
       </IonContent>

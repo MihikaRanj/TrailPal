@@ -665,7 +665,7 @@ const buildNotificationMessage = (type: string, data: any) => {
   return (
     <IonPage>
       <IonHeader>
-        <IonToolbar>
+        <IonToolbar color="light">
           <IonButtons slot="start">
             <IonButton onClick={handleBack}>
               <IonIcon icon={arrowBack} />
