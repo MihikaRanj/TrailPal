@@ -14,6 +14,7 @@ import {
   IonSelectOption,
   IonInput,
   IonModal,
+  IonFooter,
 } from '@ionic/react';
 import { useHistory, useLocation } from 'react-router-dom';
 import { arrowBack, refreshOutline } from 'ionicons/icons';
@@ -369,14 +370,16 @@ const CreateRoutePage: React.FC = () => {
         <IonHeader>
           <IonToolbar>
             <IonTitle className="custom-ion-title" >Route Map</IonTitle>
-            <IonButtons slot="end">
-              <IonButton onClick={handleHideRoute}>Close</IonButton>
-            </IonButtons>
+            
           </IonToolbar>
         </IonHeader>
         <IonContent>
           <div id="route-map" style={{ height: '400px', width: '100%' }} />
         </IonContent>
+
+              <IonButton  expand="full" onClick={handleHideRoute}>Close</IonButton>
+
+
       </IonModal>
 
       <BottomBar />

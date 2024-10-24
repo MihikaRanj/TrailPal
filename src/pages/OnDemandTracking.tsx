@@ -58,15 +58,16 @@ const OnDemandTracking: React.FC = () => {
     
     // If the foreground location permission is granted, request background location permission
     if (foregroundPermission.hasPermission) {
+      alert('Foreground location permission granted');
       const backgroundPermission = await AndroidPermissions.requestPermission(AndroidPermissions.PERMISSION.ACCESS_BACKGROUND_LOCATION);
 
       if (backgroundPermission.hasPermission) {
-        //alert('Background location permission granted');
+        alert('Background location permission granted');
       } else {
-        //alert('Background location permission denied');
+        alert('Background location permission denied:'+backgroundPermission);
       }
     } else {
-      //alert('Foreground location permission denied');
+      alert('Foreground location permission denied');
     }
     // Add SMS permission if not granted
     if (!smsPermission.hasPermission) {

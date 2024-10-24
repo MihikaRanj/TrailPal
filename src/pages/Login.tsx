@@ -29,7 +29,6 @@ const Login: React.FC = () => {
       return;
     }
 
-    console.log('before setloading');
     setLoading(true); // Set loading to true when login starts
     try {
       // Authenticate user
@@ -85,7 +84,7 @@ const Login: React.FC = () => {
           <IonInput 
             value={email}
             type="email"
-            onIonChange={(e) => setEmail(e.detail.value!)} 
+            onIonInput={(e: any) => setEmail(e.target.value)} // Use onIonInput for immediate updates
             required
           />
         </IonItem>
@@ -94,7 +93,7 @@ const Login: React.FC = () => {
           <IonInput 
             value={password}
             type="password"
-            onIonChange={(e) => setPassword(e.detail.value!)} 
+            onIonInput={(e: any) => setPassword(e.target.value)} // Use onIonInput for immediate updates
             required
           />
         </IonItem>
