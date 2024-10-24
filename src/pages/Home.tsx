@@ -88,22 +88,6 @@ const Home: React.FC = () => {
            will be only added to the estimated travel time, not also subtracted. Lastly you will be able to input your last 
            and first name for which will be used when composing a message sent to the user.<br /><br />
         </IonText>
-        <IonText>Click the button below to request SMS permission.</IonText>
-        <IonButton expand="block" onClick={requestSmsPermission}>
-          Request SMS Permission
-        </IonButton>
-
-        <IonButton color= "danger" expand="block" onClick={sendTestSms} disabled={!smsPermissionGranted}>
-          Send Test SMS
-        </IonButton>
-
-        {/* Toast to show the result of permission request and SMS status */}
-        <IonToast
-          isOpen={showToast}
-          message={toastMessage}
-          duration={2000}
-          onDidDismiss={() => setShowToast(false)}
-        />
       </IonContent>
       <BottomBar/>
     </IonPage>
