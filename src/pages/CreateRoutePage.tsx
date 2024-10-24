@@ -10,32 +10,37 @@ import {
   IonLabel,
   IonButtons,
   IonIcon,
-  IonFooter,
   IonSelect,
   IonSelectOption,
   IonInput,
+  IonModal,
 } from '@ionic/react';
 import { useHistory, useLocation } from 'react-router-dom';
-import { arrowBack, refreshOutline, carOutline, walkOutline } from 'ionicons/icons';
+import { arrowBack, refreshOutline } from 'ionicons/icons';
 import { doc, getDoc, setDoc, deleteDoc, collection, addDoc, getDocs } from 'firebase/firestore';
-import { db, auth } from '../firebaseConfig'; // Firestore config
+import { db, auth } from '../firebaseConfig';
 import BottomBar from '../components/BottomBar';
-
+import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
+import axios from 'axios';
 
 const CreateRoutePage: React.FC = () => {
   const history = useHistory();
-  const locationState = useLocation<{ from?: string, location: string; type: string; stopIndex?: number }>();
+  const locationState = useLocation<{ from?: string; location: string; type: string; stopIndex?: number }>();
 
   const [startLocation, setStartLocation] = useState<string | null>(null);
+  const [startLatLng, setStartLatLng] = useState<{ lat: number; lon: number } | null>(null);
   const [endLocation, setEndLocation] = useState<string | null>(null);
-  const [stops, setStops] = useState<string[]>([]); // Array to store multiple stops
-  const [methodOfTravel, setMethodOfTravel] = useState<string | null>(null); // New state for method of travel
-  const [estimatedTime, setEstimatedTime] = useState<string | null>(null); // New state for estimated journey time
-  const [loading, setLoading] = useState(true); // State to handle loading
+  const [endLatLng, setEndLatLng] = useState<{ lat: number; lon: number } | null>(null);
+  const [stops, setStops] = useState<string[]>([]);
+  const [methodOfTravel, setMethodOfTravel] = useState<string>('Driving');
+  const [estimatedTime, setEstimatedTime] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [showRouteModal, setShowRouteModal] = useState(false);
+  const [map, setMap] = useState<L.Map | null>(null); // Store map instance here
 
-  const user = auth.currentUser; // Get the current authenticated user
+  const user = auth.currentUser;
 
-  //console.log(locationState.state?.from );
   useEffect(() => {
     const fetchRouteData = async () => {
       if (user) {
@@ -46,12 +51,13 @@ const CreateRoutePage: React.FC = () => {
         if (docSnapshot.exists()) {
           const routeData = docSnapshot.data();
           setStartLocation(routeData.startlocation?.address || null);
+          setStartLatLng({ lat: routeData.startlocation?.lat, lon: routeData.startlocation?.lon });
           setEndLocation(routeData.endlocation?.address || null);
+          setEndLatLng({ lat: routeData.endlocation?.lat, lon: routeData.endlocation?.lon });
           setStops(routeData.stops?.map((stop: any) => stop.address) || []);
-          setMethodOfTravel(routeData.methodOfTravel || null);
+          setMethodOfTravel(routeData.methodOfTravel || 'Driving');
           setEstimatedTime(routeData.estimatedTime || null);
         }
-
       }
       setLoading(false);
     };
@@ -59,33 +65,17 @@ const CreateRoutePage: React.FC = () => {
     fetchRouteData();
   }, [user]);
 
-  const clearRouteData = async () => {
-    if (user) {
-      try {
-        const routesCollection = collection(db, 'users', user.uid, 'currentdata');
-        const routeDoc = doc(routesCollection, 'currentRoute');
-        await deleteDoc(routeDoc);
-      } catch (error) {
-        console.error('Error deleting route data:', error);
-        alert('Failed to refresh. Please try again.');
-      }
+  const handleShowRoute = () => {
+    if (startLatLng && endLatLng) {
+      setShowRouteModal(true);
+    } else {
+      alert('Please enter both start and end locations.');
     }
-
-    setStartLocation(null);
-    setEndLocation(null);
-    setStops([]);
-    setMethodOfTravel(null);
-    setEstimatedTime(null);
-    history.replace({ pathname: history.location.pathname, state: undefined });
-  };
-
-  const handleRefresh = async () => {
-    await clearRouteData();
   };
 
   const handleSaveRoute = async () => {
     if (startLocation && endLocation && estimatedTime) {
-      try {
+    try {
         if (user) {
           const routesCollection = collection(db, 'users', user.uid, 'currentdata');
           const routeDoc = doc(routesCollection, 'currentRoute');
@@ -147,13 +137,13 @@ const CreateRoutePage: React.FC = () => {
               await addDoc(savedRoutesCollection, route);
               //alert('Route saved successfully!');
             }
-  
+
           } else {
             alert('Failed to retrieve current route data.');
           }
         }
         handleBack();
-      } catch (error) {
+    } catch (error) {
         console.error('Error saving route:', error);
         alert('Failed to save the route. Please try again.');
       }
@@ -161,8 +151,33 @@ const CreateRoutePage: React.FC = () => {
       alert('Please enter both start and end locations, and the estimated journey time.');
     }
   };
-  
-  
+
+  const handleHideRoute = () => {
+    setShowRouteModal(false);
+    if (map) {
+      map.remove(); // Properly clean up the map on modal close
+      setMap(null); // Reset map instance
+    }
+  };
+
+  const fetchRoute = async (startLat: number, startLon: number, endLat: number, endLon: number, mode: string) => {
+    try {
+      const travelMode = mode === 'Driving' ? 'driving-car' : 'foot-walking';
+      const apikey = '5b3ce3597851110001cf6248d85f427c71894eb987dd971ab317c6fd'; // Use your OpenRouteService API key here
+      const response = await axios.get(
+        `https://api.openrouteservice.org/v2/directions/${travelMode}?api_key=${apikey}&start=${startLon},${startLat}&end=${endLon},${endLat}`
+      );
+
+      return response.data.features[0].geometry.coordinates.map((coord: [number, number]) => ({
+        lat: coord[1],
+        lon: coord[0],
+      }));
+    } catch (error) {
+      console.error('Error fetching route:', error);
+      return [];
+    }
+  };
+
   const handleFieldUpdate = async (field: string, value: any) => {
     if (user) {
       const routesCollection = collection(db, 'users', user.uid, 'currentdata');
@@ -172,20 +187,38 @@ const CreateRoutePage: React.FC = () => {
       updateData[field] = value;
 
       await setDoc(routeDoc, updateData, { merge: true }); // Update Firestore with new field value
-    }
+      }
   };
 
-  const handleShowRoute = () => {
-    if (startLocation && endLocation) {
-      alert('Displaying route from start to end with stops: ' + stops.join(', '));
-    } else {
-      alert('Please enter both start and end locations.');
+  const clearRouteData = async () => {
+    if (user) {
+      try {
+        const routesCollection = collection(db, 'users', user.uid, 'currentdata');
+        const routeDoc = doc(routesCollection, 'currentRoute');
+        await deleteDoc(routeDoc);
+      } catch (error) {
+        console.error('Error deleting route data:', error);
+        alert('Failed to refresh. Please try again.');
+      }
     }
+
+    setStartLocation(null);
+    setEndLocation(null);
+    setStops([]);
+    setMethodOfTravel('Driving');
+    setEstimatedTime(null);
+    history.replace({ pathname: history.location.pathname, state: undefined });
   };
+
+  const handleRefresh = async () => {
+    await clearRouteData();
+  };
+
 
   const handleAddStop = () => {
     setStops([...stops, '']);
   };
+
 
   const handleBack = async () => {
     //await clearRouteData();
@@ -195,13 +228,47 @@ const CreateRoutePage: React.FC = () => {
       history.push('/track-route/scheduled'); // Go back to ScheduledTracking
     } else {
       history.push('/track-route'); // Default fallback if no source is found
-    }
+          }
     //history.push('/track-route');
   };
 
-  if (loading) {
-    return <IonContent>Loading...</IonContent>;
-  }
+  // UseEffect to initialize the map after the modal is rendered
+  useEffect(() => {
+    if (showRouteModal && startLatLng && endLatLng && !map) {
+      const initializeMap = async () => {
+        // Wait for the DOM to render the map container
+        setTimeout(async () => {
+          const mapInstance = L.map('route-map').setView([startLatLng.lat, startLatLng.lon], 13);
+          setMap(mapInstance); // Store the map instance
+
+          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors',
+          }).addTo(mapInstance);
+
+          const waypoints = [];
+          const routeCoords = await fetchRoute(startLatLng.lat, startLatLng.lon, endLatLng.lat, endLatLng.lon, methodOfTravel);
+
+          if (routeCoords.length > 0) {
+            const latlngs = routeCoords.map((coord: { lat: any; lon: any }) => [coord.lat, coord.lon]);
+            L.polyline(latlngs, { color: 'blue' }).addTo(mapInstance); // Draw the route
+          }
+
+          if (startLatLng) {
+            waypoints.push(L.marker([startLatLng.lat, startLatLng.lon]).bindPopup('Start: ' + startLocation).addTo(mapInstance));
+          }
+
+          if (endLatLng) {
+            waypoints.push(L.marker([endLatLng.lat, endLatLng.lon]).bindPopup('End: ' + endLocation).addTo(mapInstance));
+          }
+
+          const group = L.featureGroup(waypoints);
+          mapInstance.fitBounds(group.getBounds());
+        }, 300); // Delay to ensure DOM is fully rendered
+      };
+
+      initializeMap();
+    }
+  }, [showRouteModal, startLatLng, endLatLng, methodOfTravel, map]);
 
   return (
     <IonPage>
@@ -223,31 +290,29 @@ const CreateRoutePage: React.FC = () => {
           </IonButtons>
         </IonToolbar>
       </IonHeader>
-      
+
       <IonContent>
-      {startLocation ? (
+        {startLocation ? (
           <IonItem>
             <IonLabel>Start Location: {startLocation}</IonLabel>
           </IonItem>
         ) : (
           <IonItem>
-            <IonButton expand="block" onClick={() => history.push({pathname: '/map/start',state: { from: locationState.state?.from }})}>
-            Select Starting Location (required)
-          </IonButton>
+            <IonButton expand="block" onClick={() => history.push({ pathname: '/map/start', state: { from: locationState.state?.from } })}>
+              Select Starting Location (required)
+            </IonButton>
           </IonItem>
-      )}
+        )}
 
-      
         {endLocation ? (
           <IonItem>
             <IonLabel>End Location: {endLocation}</IonLabel>
           </IonItem>
         ) : (
-
           <IonItem lines="none" style={{ display: 'flex', justifyContent: 'center' }}>
-            <IonButton expand="block" onClick={() => history.push({pathname: '/map/end',state: { from: locationState.state?.from }})}>
-            Select Ending Location (required)
-          </IonButton>
+            <IonButton expand="block" onClick={() => history.push({ pathname: '/map/end', state: { from: locationState.state?.from } })}>
+              Select Ending Location (required)
+            </IonButton>
           </IonItem>
         )}
 
@@ -260,46 +325,28 @@ const CreateRoutePage: React.FC = () => {
           </IonItem>
         ))}
 
-        {/* Method of Travel Input */}
         <IonItem>
           <IonLabel>Method of Travel</IonLabel>
-          <IonSelect
-            value={methodOfTravel}
-            placeholder="Select Travel Method"
-            onIonChange={(e) => {
-              setMethodOfTravel(e.detail.value);
-              handleFieldUpdate('methodOfTravel', e.detail.value); // Update Firestore when selected
-            }}
-          >
-            <IonSelectOption value="Driving">
-              🚗 Driving {/* Use emojis instead of IonIcons for now */}
-            </IonSelectOption>
-            <IonSelectOption value="Walking">
-              🚶 Walking
-            </IonSelectOption>
+          <IonSelect value={methodOfTravel} placeholder="Select Travel Method" onIonChange={(e) => setMethodOfTravel(e.detail.value)}>
+            <IonSelectOption value="Driving">🚗 Driving</IonSelectOption>
+            <IonSelectOption value="Walking">🚶 Walking</IonSelectOption>
           </IonSelect>
         </IonItem>
 
-        {/* Estimated Journey Time Input */}
         <IonItem>
           <IonLabel>Estimated Journey Time (required)</IonLabel>
           <IonInput
             type="number"
             value={estimatedTime || ''}
-            onIonChange={(e) => {
-              setEstimatedTime(e.detail.value!);
-              handleFieldUpdate('estimatedTime', e.detail.value!); // Update Firestore when entered
-            }}
+            onIonChange={(e) => setEstimatedTime(e.detail.value!)}
             required
             placeholder="minutes"
-            style={{ width: '100px', marginLeft: 'auto' }} // Ensure input is compact and right-aligned
+            style={{ width: '100px', marginLeft: 'auto' }}
           />
         </IonItem>
       </IonContent>
 
-      
-        <IonToolbar>
-          <IonButton expand="full"  onClick={handleAddStop}>
+      <IonButton expand="full"  onClick={handleAddStop}>
             Add Stop
           </IonButton>
 
@@ -312,13 +359,27 @@ const CreateRoutePage: React.FC = () => {
             Save Route
           </IonButton>
 
-          <IonButton expand="full"  onClick={handleShowRoute}>
-            Show Route
-          </IonButton>
-        </IonToolbar>
-        <BottomBar />
-    
-      
+      <IonToolbar>
+        <IonButton expand="full" onClick={handleShowRoute}>
+          Show Route
+        </IonButton>
+      </IonToolbar>
+
+      <IonModal isOpen={showRouteModal} onDidDismiss={handleHideRoute}>
+        <IonHeader>
+          <IonToolbar>
+            <IonTitle>Route Map</IonTitle>
+            <IonButtons slot="end">
+              <IonButton onClick={handleHideRoute}>Close</IonButton>
+            </IonButtons>
+          </IonToolbar>
+        </IonHeader>
+        <IonContent>
+          <div id="route-map" style={{ height: '400px', width: '100%' }} />
+        </IonContent>
+      </IonModal>
+
+      <BottomBar />
     </IonPage>
   );
 };
