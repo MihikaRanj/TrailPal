@@ -51,43 +51,26 @@ const OnDemandTracking: React.FC = () => {
   const requestPermissions = async () => {
   try {
     // Check permissions for ACCESS_FINE_LOCATION, ACCESS_BACKGROUND_LOCATION, and SEND_SMS
-    const locationPermission = await AndroidPermissions.checkPermission(AndroidPermissions.PERMISSION.ACCESS_FINE_LOCATION);
-    const backgroundLocationPermission = await AndroidPermissions.checkPermission(AndroidPermissions.PERMISSION.ACCESS_BACKGROUND_LOCATION);
     const smsPermission = await AndroidPermissions.checkPermission(AndroidPermissions.PERMISSION.SEND_SMS);
 
-    // Create a list of permissions to request
-    const permissionsToRequest = [];
+    // First, request foreground location permission
+    const foregroundPermission = await AndroidPermissions.requestPermission(AndroidPermissions.PERMISSION.ACCESS_FINE_LOCATION);
+    
+    // If the foreground location permission is granted, request background location permission
+    if (foregroundPermission.hasPermission) {
+      const backgroundPermission = await AndroidPermissions.requestPermission(AndroidPermissions.PERMISSION.ACCESS_BACKGROUND_LOCATION);
 
-    // Add location permissions if not granted
-    if (!locationPermission.hasPermission) {
-      permissionsToRequest.push(AndroidPermissions.PERMISSION.ACCESS_FINE_LOCATION);
-    }
-
-    if (!backgroundLocationPermission.hasPermission) {
-      permissionsToRequest.push(AndroidPermissions.PERMISSION.ACCESS_BACKGROUND_LOCATION);
-    }
-
-    // Add SMS permission if not granted
-    if (!smsPermission.hasPermission) {
-      permissionsToRequest.push(AndroidPermissions.PERMISSION.SEND_SMS);
-    }
-
-    // Request permissions if any are needed
-    if (permissionsToRequest.length > 0) {
-      const result = await AndroidPermissions.requestPermissions(permissionsToRequest);
-
-      // Check if all permissions were granted
-      const locationGranted = result.hasPermission || await AndroidPermissions.checkPermission(AndroidPermissions.PERMISSION.ACCESS_FINE_LOCATION);
-      const backgroundLocationGranted = result.hasPermission || await AndroidPermissions.checkPermission(AndroidPermissions.PERMISSION.ACCESS_BACKGROUND_LOCATION);
-      const smsGranted = result.hasPermission || await AndroidPermissions.checkPermission(AndroidPermissions.PERMISSION.SEND_SMS);
-
-      if (!locationGranted.hasPermission || !backgroundLocationGranted.hasPermission || !smsGranted.hasPermission) {
-        alert('Location or SMS permission not granted');
+      if (backgroundPermission.hasPermission) {
+        alert('Background location permission granted');
       } else {
-        alert('All required permissions granted');
+        alert('Background location permission denied');
       }
     } else {
-      alert('All permissions are already granted');
+      alert('Foreground location permission denied');
+    }
+    // Add SMS permission if not granted
+    if (!smsPermission.hasPermission) {
+      const smsGranted = AndroidPermissions.requestPermission(AndroidPermissions.PERMISSION.SEND_SMS);
     }
   } catch (err) {
     console.warn('Error requesting permissions', err);
@@ -681,7 +664,7 @@ const buildNotificationMessage = (type: string, data: any) => {
               Back
             </IonButton>
           </IonButtons>
-          <IonTitle>On-demand Tracking</IonTitle>
+          <IonTitle className="custom-ion-title">On-demand Tracking</IonTitle>
           <IonButtons slot="end">
             <IonButton onClick={handleRefresh}>
               <IonIcon slot="icon-only" icon={refreshOutline} />
@@ -785,7 +768,7 @@ const buildNotificationMessage = (type: string, data: any) => {
                   Back
                 </IonButton>
               </IonButtons>
-              <IonTitle>Add Contact</IonTitle>
+              <IonTitle className="custom-ion-title">Add Contact</IonTitle>
               <IonButtons slot="end">
                 <IonButton onClick={handleContactRefresh}>
                   <IonIcon slot="icon-only" icon={refreshOutline} />
@@ -844,7 +827,7 @@ const buildNotificationMessage = (type: string, data: any) => {
                   Back
                 </IonButton>
               </IonButtons>
-              <IonTitle>Select Route</IonTitle>
+              <IonTitle className="custom-ion-title">Select Route</IonTitle>
               <IonButtons slot="end">
                 <IonButton onClick={fetchSavedRoutes}>
                   <IonIcon slot="icon-only" icon={refreshOutline} />

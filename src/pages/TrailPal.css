@@ -17,5 +17,12 @@
     background-color: #d61818; /* Change to the color you want */
   }
   
+  .custom-ion-title {
+    font-size: 12px; /* Adjust font size */
+    white-space: nowrap; /* Prevent wrapping */
+    overflow: hidden; /* Hide overflowing text */
+    text-overflow: ellipsis; /* Add ellipsis (...) for overflow */
+  }
+  
   
   

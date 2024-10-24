@@ -362,7 +362,7 @@ const CreateScheduledRoute: React.FC = () => {
               Back
             </IonButton>
           </IonButtons>
-          <IonTitle>Create Scheduled Tracking Route</IonTitle>
+          <IonTitle className="custom-ion-title">Create Scheduled Tracking Route</IonTitle>
           <IonButtons slot="end">
             <IonButton onClick={handleRefresh}>
               <IonIcon slot="icon-only" icon={refreshOutline} />
@@ -488,7 +488,7 @@ const CreateScheduledRoute: React.FC = () => {
                   Back
                 </IonButton>
               </IonButtons>
-              <IonTitle>Add Contact</IonTitle>
+              <IonTitle className="custom-ion-title">Add Contact</IonTitle>
               <IonButtons slot="end">
                 <IonButton onClick={handleContactRefresh}>
                   <IonIcon slot="icon-only" icon={refreshOutline} />
@@ -547,7 +547,7 @@ const CreateScheduledRoute: React.FC = () => {
                   Back
                 </IonButton>
               </IonButtons>
-              <IonTitle>Select Route</IonTitle>
+              <IonTitle className="custom-ion-title">Select Route</IonTitle>
               <IonButtons slot="end">
                 <IonButton onClick={fetchSavedRoutes}>
                   <IonIcon slot="icon-only" icon={refreshOutline} />

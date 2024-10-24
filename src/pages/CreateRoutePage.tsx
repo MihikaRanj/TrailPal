@@ -281,7 +281,7 @@ const CreateRoutePage: React.FC = () => {
             </IonButton>
           </IonButtons>
 
-          <IonTitle>Create Route</IonTitle>
+          <IonTitle className="custom-ion-title">Create Route</IonTitle>
 
           <IonButtons slot="end">
             <IonButton onClick={handleRefresh}>
@@ -368,7 +368,7 @@ const CreateRoutePage: React.FC = () => {
       <IonModal isOpen={showRouteModal} onDidDismiss={handleHideRoute}>
         <IonHeader>
           <IonToolbar>
-            <IonTitle>Route Map</IonTitle>
+            <IonTitle className="custom-ion-title" >Route Map</IonTitle>
             <IonButtons slot="end">
               <IonButton onClick={handleHideRoute}>Close</IonButton>
             </IonButtons>

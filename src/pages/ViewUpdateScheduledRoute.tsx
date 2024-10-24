@@ -113,7 +113,7 @@ const ViewUpdateScheduledRoute: React.FC = () => {
               Back
             </IonButton>
           </IonButtons>
-          <IonTitle>View/Update Scheduled Routes</IonTitle>
+          <IonTitle className="custom-ion-title">View/Update Scheduled Routes</IonTitle>
         </IonToolbar>
       </IonHeader>
 
@@ -128,7 +128,7 @@ const ViewUpdateScheduledRoute: React.FC = () => {
                   Back
                 </IonButton>
               </IonButtons>
-              <IonTitle>Select a Scheduled Route</IonTitle>
+              <IonTitle className="custom-ion-title">Select Scheduled Route</IonTitle>
             </IonToolbar>
           </IonHeader>
           <IonContent>
@@ -157,7 +157,7 @@ const ViewUpdateScheduledRoute: React.FC = () => {
                   Back
                 </IonButton>
               </IonButtons>
-              <IonTitle>Update Scheduled Route</IonTitle>
+              <IonTitle className="custom-ion-title">Update Scheduled Route</IonTitle>
             </IonToolbar>
           </IonHeader>
 

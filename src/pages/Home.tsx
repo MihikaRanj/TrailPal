@@ -75,18 +75,16 @@ const Home: React.FC = () => {
       </IonHeader>
       <IonContent color="success" className="ion-padding">
       <IonText>
-          Hello! Welcome to <b>Trailpal</b>, an app than will help make travelling more safer.
+          Hello! Welcome to <b>TrailPal</b>, an app that will be your Pal when you are travelling alone by monitoring your path.
           <br />
           <br />
-          On the bottom of this screen you will see a few icons: Track Route, Settings, Logout.<br /><br />
-          <b>Track Route</b>- After pressing the Track Route icon, you will be taken to a page in which you can start making your paths that
-          you want tracked.
-          You can also save paths and start your tracking!<br /><br />
-          <b>Settings</b>- In this page, you will get to input some important information used in all you trackings. This includes 
+          <b>Track Route</b>- After pressing this icon you will be taken to a page in which you can start making your paths that
+          you want to be tracked.
+          You can also save paths and contacts, start your tracking right away or schedule them for future use!<br /><br />
+          <b>Settings</b>- In this page, you will get to input some important information used in all of your trackings. This includes 
           the number of miles that one is allowed to deviate away from their path, as well as the number of minutes that one 
-          is allowed to deviate from their originial estimated travel time. Keep in mind that the number of minutes inputed
-           will be only added to the estimated travel time, not also subtracted. Lastly you will be able to input your last 
-           and first name for which will be used when composing a message sent to the user.<br /><br />
+          is allowed to deviate from their original estimated travel time before their contact is alerted. Lastly you will be able to input your last 
+           and first name which will be used when composing a message sent to the user.<br /><br />
         </IonText>
       </IonContent>
       <BottomBar/>

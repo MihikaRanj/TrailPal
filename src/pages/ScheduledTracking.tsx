@@ -27,7 +27,7 @@ const ScheduledTracking: React.FC = () => {
               Back
             </IonButton>
           </IonButtons>
-          <IonTitle>Scheduled Tracking</IonTitle>
+          <IonTitle className="custom-ion-title">Scheduled Tracking</IonTitle>
         </IonToolbar>
       </IonHeader>
 
