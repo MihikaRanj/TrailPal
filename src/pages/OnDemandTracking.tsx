@@ -50,13 +50,19 @@ const OnDemandTracking: React.FC = () => {
 
   const requestPermissions = async () => {
     try {
-      // Check and request permissions for both ACCESS_FINE_LOCATION and SEND_SMS
+      // Check and request permissions for ACCESS_FINE_LOCATION, ACCESS_BACKGROUND_LOCATION, and SEND_SMS
       const locationPermission = await AndroidPermissions.checkPermission(AndroidPermissions.PERMISSION.ACCESS_FINE_LOCATION);
+      const backgroundLocationPermission = await AndroidPermissions.checkPermission(AndroidPermissions.PERMISSION.ACCESS_BACKGROUND_LOCATION);
       const smsPermission = await AndroidPermissions.checkPermission(AndroidPermissions.PERMISSION.SEND_SMS);
   
       // Request location permission if not granted
       if (!locationPermission.hasPermission) {
         await AndroidPermissions.requestPermission(AndroidPermissions.PERMISSION.ACCESS_FINE_LOCATION);
+      }
+  
+      // Request background location permission if not granted
+      if (!backgroundLocationPermission.hasPermission) {
+        await AndroidPermissions.requestPermission(AndroidPermissions.PERMISSION.ACCESS_BACKGROUND_LOCATION);
       }
   
       // Request SMS permission if not granted
@@ -66,9 +72,10 @@ const OnDemandTracking: React.FC = () => {
   
       // Check if permissions were granted
       const locationGranted = await AndroidPermissions.checkPermission(AndroidPermissions.PERMISSION.ACCESS_FINE_LOCATION);
+      const backgroundLocationGranted = await AndroidPermissions.checkPermission(AndroidPermissions.PERMISSION.ACCESS_BACKGROUND_LOCATION);
       const smsGranted = await AndroidPermissions.checkPermission(AndroidPermissions.PERMISSION.SEND_SMS);
   
-      if (!locationGranted.hasPermission || !smsGranted.hasPermission) {
+      if (!locationGranted.hasPermission || !backgroundLocationGranted.hasPermission || !smsGranted.hasPermission) {
         alert('Location or SMS permission not granted');
       } else {
         alert('All required permissions granted');
@@ -77,16 +84,20 @@ const OnDemandTracking: React.FC = () => {
       console.warn('Error requesting permissions', err);
     }
   };
-  
+
   useEffect(() => {
+    // Request permissions when the component mounts
     requestPermissions();
-    fetchUserData(); // Ensure user data is fetched before continuing
+  
+    // Fetch user data and route information
+    fetchUserData();
+    
     const fetchRouteData = async () => {
       if (user) {
         const routesCollection = collection(db, 'users', user.uid, 'currentdata');
         const routeDoc = doc(routesCollection, 'currentRoute');
         const contactDoc = doc(routesCollection, 'currentContact');
-
+  
         const routeSnapshot = await getDoc(routeDoc);
         if (routeSnapshot.exists()) {
           const routeData = routeSnapshot.data();
@@ -96,7 +107,7 @@ const OnDemandTracking: React.FC = () => {
           setMethodOfTravel(routeData.methodOfTravel || null);
           setEstimatedTime(routeData.estimatedTime || null);
         }
-
+  
         const contactSnapshot = await getDoc(contactDoc);
         if (contactSnapshot.exists()) {
           const contactData = contactSnapshot.data();
@@ -109,51 +120,53 @@ const OnDemandTracking: React.FC = () => {
       }
       setLoading(false);
     };
-
+  
     // Enable Background Mode
     const enableBackgroundMode = () => {
       if (window.cordova) {
         // Enable the background mode
         BackgroundMode.enable();
-
+  
         // Optional: Customize the notification when the app is in the background
         BackgroundMode.setDefaults({
           title: 'Tracking in progress',
-          text: 'Your location is being tracked.',
+          text: 'Your location is being tracked in the background.',
           color: 'F14F4D', // Notification icon color (Android)
         });
-
+  
         // Disable web view optimizations
         BackgroundMode.disableWebViewOptimizations();
-
+  
         // Listen for background mode activation
         document.addEventListener('activate', () => {
           console.log('App is running in background mode.');
+          // Ensure location tracking continues in background mode
+          trackLocation();
         });
-
+  
         // Listen for background mode deactivation
         document.addEventListener('deactivate', () => {
           console.log('App is running in foreground mode.');
         });
       }
     };
-
+  
+    // Call the functions to fetch data and enable background mode
     fetchRouteData();
     enableBackgroundMode(); // Activate background mode tracking
-
+  
     // Cleanup event listeners when component unmounts
     return () => {
       document.removeEventListener('activate', () => {
         console.log('Background mode listener removed.');
       });
-
+  
       document.removeEventListener('deactivate', () => {
         console.log('Foreground mode listener removed.');
       });
     };
-  }, [user]);
-
-
+  }, [user]);  // This ensures the effect re-runs when the `user` changes
+  
 
   // Load route and contact data on view enter
   useIonViewWillEnter(() => {
